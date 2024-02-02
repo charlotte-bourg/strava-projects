@@ -122,40 +122,6 @@ def webhook():
 #     return "sent"
 
 
-# @app.route('/update-gear/create-webhook')
-# def create_webhook():
-#     webhook_data = {
-#         'client_id': CLIENT_ID,
-#         'client_secret': CLIENT_SECRET,
-#         'callback_url': 'https://ea7d-23-118-109-73.ngrok.io/webhook',
-#         'verify_token': STRAVA_VERIFY_TOKEN
-#     }
-
-#     response = requests.post('{BASE_URL}/push_subscriptions', data=webhook_data)
-#     subscription_data = response.json()
-
-#     print("HEY YOUR SUBSCRIPTION DATA IS HERE")
-#     print(subscription_data)
-#     session['subscription_id'] = subscription_data.get('id', '')
-#     return f'Webhook subscription created?'
-
-# @app.route('/update-gear/view-webhook')
-# def view_webhook():
-#     # View details of the webhook subscription
-#     subscription_id = 252249
-
-#     params = {
-#         'client_id': CLIENT_ID,
-#         'client_secret': CLIENT_SECRET,
-#     }
-
-#     response = requests.get(f'{BASE_URL}/push_subscriptions/', params=params)
-#     subscription_data = response.json()
-
-#     return jsonify(subscription_data)
-
-
-
 if __name__ == '__main__':
     # connect_to_db(app)
     app.run('0.0.0.0', debug=True)
