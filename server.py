@@ -65,8 +65,7 @@ mail = Mail(app)
 
 @app.route('/')
 def home():
-    # return render_template('index.html')
-    return redirect ('/update-gear')
+     return render_template('index.html')
 
 @app.route('/update-gear')
 def updateGear():
@@ -76,13 +75,17 @@ def updateGear():
 def load_user(user_id):
     return crud.get_user_by_id(user_id)
 
+@app.route('/returning-user')
+def display_login():
+    return render_template('login.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
         user = crud.get_user_by_email(email) 
-        if user and user.check_password(password):
+        if user and crud.check_password(user, password):
             login_user(user)
             flash("logged in!")
             return redirect('/update-gear/strava-auth')
@@ -192,6 +195,6 @@ def send_email():
     return "sent"
 
 if __name__ == '__main__':
-    # connect_to_db(app)
+    connect_to_db(app)
     app.run('0.0.0.0', debug=True)
     app.app_context().push()
