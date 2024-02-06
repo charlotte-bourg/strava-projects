@@ -1,18 +1,16 @@
 """Server for running helper app."""
+
 import os 
 import requests
-import asyncio
 from flask import Flask, render_template, request, redirect, session, jsonify 
 from flask_mail import Mail, Message
-import time
-import datetime
-
 from celery import Celery, Task
 import logging 
 
 app = Flask(__name__)
 app.secret_key = os.environ['FLASK_KEY']
 
+# Celery setup 
 def celery_init_app(app: Flask) -> Celery:
     class FlaskTask(Task):
         def __call__(self, *args: object, **kwargs: object) -> object:
@@ -34,6 +32,7 @@ app.config.from_mapping(
 celery = celery_init_app(app)
 celery.log.setup(loglevel=logging.DEBUG)
 
+# Retrieve secrets 
 CLIENT_ID = os.environ['CLIENT_ID']
 CLIENT_SECRET = os.environ['CLIENT_SECRET']
 REDIRECT_URI = os.environ['REDIRECT_URI']
@@ -45,6 +44,7 @@ AUTHORIZE_URL = 'https://www.strava.com/oauth/authorize'
 TOKEN_URL = 'https://www.strava.com/api/v3/oauth/token'
 DEAUTHORIZE_URL = 'https://www.strava.com/oauth/deauthorize'
 
+# Permission scopes for Strava authentication 
 SCOPES = 'read_all,activity:read_all'
 
 # flask-mail configuration
@@ -95,26 +95,13 @@ def callback():
         print(session)
         return f'Authentication successful! Welcome {token_data["athlete"]["firstname"]}!'
 
-
     return 'Authentication failed.'
 
-@app.route('/webhook', methods=['GET', 'POST'])
+@app.route('/webhook', methods=['POST'])
 def webhook():
-    if request.method == 'GET':
-        hub_challenge = request.args.get('hub.challenge', '')
-        hub_verify_token = request.args.get('hub.verify_token', '')
-        if hub_verify_token == STRAVA_VERIFY_TOKEN:
-            return jsonify({'hub.challenge': hub_challenge})
-        elif hub_verify_token:
-            return 'Invalid verify token', 403
-        data = request.args.get('object_type', '')
-        print(data)
-        return "hello."
-    elif request.method == 'POST':
-        data = request.get_json()
-        process_new_activity.delay(data)
-        return jsonify({"status": "success"}), 200
-    return 'Invalid request'
+    data = request.get_json()
+    process_new_activity.delay(data)
+    return jsonify({"status": "success"}), 200
 
 @celery.task
 def process_new_activity(data):
@@ -135,12 +122,7 @@ def process_new_activity(data):
     else:
         print("this should fire an email to check your gear!")
 
-    
-async def process(activity_id):
-    print('hey gurl')
-
-@app.route('/test-email')
-def test_email():
+def send_email():
     msg = Message('Hello from strava gear updater', sender = 'stravagearupdater@gmail.com', recipients = ['charlotte.bourg@gmail.com'])
     msg.body = "testing from flask-mail"
     mail.send(msg)
