@@ -2,13 +2,18 @@
 
 import os 
 import requests
-from flask import Flask, render_template, request, redirect, session, jsonify 
+from flask import Flask, flash, render_template, request, redirect, session, jsonify 
 from flask_mail import Mail, Message
 from celery import Celery, Task
 import logging 
+#from flask_login import LoginManager
 
 app = Flask(__name__)
 app.secret_key = os.environ['FLASK_KEY']
+
+# flask-login setup
+# login_manager = LoginManager()
+# login_manager.init_app(app)
 
 # Celery setup 
 def celery_init_app(app: Flask) -> Celery:
@@ -45,7 +50,7 @@ TOKEN_URL = 'https://www.strava.com/api/v3/oauth/token'
 DEAUTHORIZE_URL = 'https://www.strava.com/oauth/deauthorize'
 
 # Permission scopes for Strava authentication 
-SCOPES = 'read_all,activity:read_all'
+SCOPES = 'activity:read_all'
 
 # flask-mail configuration
 app.config['MAIL_SERVER']='smtp.gmail.com'
@@ -61,7 +66,8 @@ users = {}
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    # return render_template('index.html')
+    return redirect ('/update-gear')
 
 @app.route('/update-gear')
 def updateGear():
@@ -73,22 +79,30 @@ def authenticate():
 
 @app.route('/update-gear/callback')
 def callback():
+    err = request.args.get('error', '')
+    if err: 
+        flash("Can't set up gear updater without your Strava authentication")
+        return redirect('/update-gear')
+    
     # Handle the callback from Strava after user authorization
     code = request.args.get('code')
+    scopes = request.args.get('scope')
 
     # Exchange the authorization code for access and refresh tokens
     data = {
         'client_id': CLIENT_ID,
         'client_secret': CLIENT_SECRET,
-        'code': code,
-        'grant_type': 'authorization_code',
+        'code': code, # obtained from redirect 
+        'grant_type': 'authorization_code', # always 'authorization_code' for initial authentication
     }
     
     response = requests.post(TOKEN_URL, data=data)
 
     if response.status_code == 200:
         token_data = response.json()
+        print(token_data)
         # TODO move to db
+        expiration = token_data['expires_at']
         session['access_token'] = token_data['access_token']
         session['refresh_token'] = token_data['refresh_token']
         print('your session data is as follows')
@@ -97,22 +111,37 @@ def callback():
 
     return 'Authentication failed.'
 
-@app.route('/webhook', methods=['POST'])
+@app.route('/webhook', methods=['GET','POST'])
 def webhook():
-    data = request.get_json()
-    process_new_activity.delay(data)
-    return jsonify({"status": "success"}), 200
+    if request.method == 'GET':
+        print("hello :)")
+        hub_challenge = request.args.get('hub.challenge', '')
+        hub_verify_token = request.args.get('hub.verify_token', '')
+        if hub_verify_token == STRAVA_VERIFY_TOKEN:
+            print("we out here")
+            return jsonify({'hub.challenge': hub_challenge})
+        elif hub_verify_token:
+            print("we here actually")
+            return 'Invalid verify token', 403
+        else:
+            print("there's a problem")
+    elif request.method == 'POST':
+        data = request.get_json()
+        print("we got a post request on our webhook")
+        process_new_activity.delay(data)
+        return jsonify({"status": "success"})
+    else:
+        return "Invalid request"
 
 @celery.task
 def process_new_activity(data):
     activity_id = data['object_id']
     print(f'hey! thanks for telling me to process activity {activity_id}')
-    # if 'access_token' in session:
-    #   access_token = session['access_token']
-    access_token = 'f16e2ceb5a6b2f9f62d18e9773f7439031b5b58d'
+    if 'access_token' in session:
+        print("yea!")
+    access_token = "a51ca2b9c4d8342b8289f27a8c270369dc4abd40"
     headers = {'Authorization': f'Bearer {access_token}'}
     params = {'include_all_efforts': False}
-    print("what's happening")
     resp = requests.get(f'{BASE_URL}/activities/{activity_id}', headers=headers, params=params)
     respData = resp.json()
     gearDeets = respData['gear']
@@ -121,6 +150,10 @@ def process_new_activity(data):
         print("you used your primary gear! no email needed :)")
     else:
         print("this should fire an email to check your gear!")
+    # else: 
+    #     print("can't process activity without access token!")
+
+    
 
 def send_email():
     msg = Message('Hello from strava gear updater', sender = 'stravagearupdater@gmail.com', recipients = ['charlotte.bourg@gmail.com'])
@@ -131,3 +164,4 @@ def send_email():
 if __name__ == '__main__':
     # connect_to_db(app)
     app.run('0.0.0.0', debug=True)
+    app.app_context().push()

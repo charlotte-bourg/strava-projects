@@ -2,10 +2,6 @@
 
 import os 
 import requests 
-from flask import Flask, request, jsonify 
-
-app = Flask(__name__)
-app.secret_key = os.environ['FLASK_KEY']
 
 CLIENT_ID = os.environ['CLIENT_ID']
 CLIENT_SECRET = os.environ['CLIENT_SECRET']
@@ -27,15 +23,6 @@ def create_webhook_subscription():
     response = requests.post(f'{BASE_URL}/push_subscriptions', data=webhook_data)
     subscription_data = response.json()
     print(subscription_data)
-
-@app.route('/webhook', methods=['GET'])
-def webhook():
-    hub_challenge = request.args.get('hub.challenge', '')
-    hub_verify_token = request.args.get('hub.verify_token', '')
-    if hub_verify_token == STRAVA_VERIFY_TOKEN:
-        return jsonify({'hub.challenge': hub_challenge})
-    elif hub_verify_token:
-        return 'Invalid verify token', 403
 
 def view_webhook_subscription():
     """View the details of a webhook subscription"""
@@ -61,3 +48,4 @@ def delete_webhook_subscription():
 
     response = requests.delete(url, params=params)
     print(response)
+   
