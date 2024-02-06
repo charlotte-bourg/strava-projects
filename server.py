@@ -6,14 +6,16 @@ from flask import Flask, flash, render_template, request, redirect, session, jso
 from flask_mail import Mail, Message
 from celery import Celery, Task
 import logging 
-#from flask_login import LoginManager
+from flask_login import LoginManager, login_user, logout_user
+import crud
+from model import db, connect_to_db
 
 app = Flask(__name__)
 app.secret_key = os.environ['FLASK_KEY']
 
 # flask-login setup
-# login_manager = LoginManager()
-# login_manager.init_app(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
 
 # Celery setup 
 def celery_init_app(app: Flask) -> Celery:
@@ -61,9 +63,6 @@ app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USE_SSL'] = True
 mail = Mail(app)
 
-# TODO replace with DB
-users = {}
-
 @app.route('/')
 def home():
     # return render_template('index.html')
@@ -73,7 +72,40 @@ def home():
 def updateGear():
     return render_template('update-gear.html')
 
-@app.route('/update-gear/login')
+@login_manager.user_loader
+def load_user(user_id):
+    return crud.get_user_by_id(user_id)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        user = crud.get_user_by_email(email) 
+        if user and user.check_password(password):
+            login_user(user)
+            flash("logged in!")
+            return redirect('/update-gear/strava-auth')
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    flash("logged out!")
+    return redirect('/')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        new_user = crud.create_user(email, password)
+        db.session.add(new_user)
+        db.session.commit()
+        return redirect('/login')
+    return render_template('register.html')
+
+@app.route('/update-gear/strava-auth')
 def authenticate():
     return redirect(f'{AUTHORIZE_URL}?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={SCOPES}')
 
@@ -152,8 +184,6 @@ def process_new_activity(data):
         print("this should fire an email to check your gear!")
     # else: 
     #     print("can't process activity without access token!")
-
-    
 
 def send_email():
     msg = Message('Hello from strava gear updater', sender = 'stravagearupdater@gmail.com', recipients = ['charlotte.bourg@gmail.com'])
