@@ -1,11 +1,38 @@
 """Server for running helper app."""
 import os 
 import requests
+import asyncio
 from flask import Flask, render_template, request, redirect, session, jsonify 
 from flask_mail import Mail, Message
+import time
+import datetime
+
+from celery import Celery, Task
+import logging 
 
 app = Flask(__name__)
 app.secret_key = os.environ['FLASK_KEY']
+
+def celery_init_app(app: Flask) -> Celery:
+    class FlaskTask(Task):
+        def __call__(self, *args: object, **kwargs: object) -> object:
+            with app.app_context():
+                return self.run(*args, **kwargs)
+
+    celery_app = Celery(app.name, task_cls=FlaskTask)
+    celery_app.config_from_object(app.config["CELERY"])
+    celery_app.set_default()
+    app.extensions["celery"] = celery_app
+    return celery_app
+
+app.config.from_mapping(
+    CELERY=dict(
+        broker_url="redis://localhost",
+        result_backend="redis://localhost"
+    ),
+)
+celery = celery_init_app(app)
+celery.log.setup(loglevel=logging.DEBUG)
 
 CLIENT_ID = os.environ['CLIENT_ID']
 CLIENT_SECRET = os.environ['CLIENT_SECRET']
@@ -64,8 +91,10 @@ def callback():
         # TODO move to db
         session['access_token'] = token_data['access_token']
         session['refresh_token'] = token_data['refresh_token']
-
+        print('your session data is as follows')
+        print(session)
         return f'Authentication successful! Welcome {token_data["athlete"]["firstname"]}!'
+
 
     return 'Authentication failed.'
 
@@ -83,44 +112,39 @@ def webhook():
         return "hello."
     elif request.method == 'POST':
         data = request.get_json()
-        print(data)
-        print("this is where'd we'd fire off async work to send an email!")
+        process_new_activity.delay(data)
         return jsonify({"status": "success"}), 200
     return 'Invalid request'
 
-# @app.route('/test-process-new')
-# def process_new_activity_test():
-#     # should receive new activity ID
-#     # get details of activity
-#     activity_id = 10236610394
-#     process_new_activity(activity_id)
-#     return "nice"
-    
-# def process_new_activity(activity_id):
-#     if 'access_token' in session:
-#         access_token = session['access_token']
-#     else:
-#         pass # add error handling
-#     headers = {'Authorization': f'Bearer {access_token}'}
-#     params = {'include_all_efforts': False}
-#     resp = requests.get(f'{BASE_URL}/activities/{activity_id}', headers=headers, params=params)
-#     respData = resp.json()
-#     # get athlete's default gear at time of activity
-#     print(respData)
-#     if 'gear' not in respData:
-#         pass #error
-#     else:
-#         if respData['gear']['primary'] == True:
-#             test_email()
-#     return 1 
-    
-# @app.route('/test-email')
-# def test_email():
-#     msg = Message('Hello from strava gear updater', sender = 'stravagearupdater@gmail.com', recipients = ['charlotte.bourg@gmail.com'])
-#     msg.body = "testing from flask-mail"
-#     mail.send(msg)
-#     return "sent"
+@celery.task
+def process_new_activity(data):
+    activity_id = data['object_id']
+    print(f'hey! thanks for telling me to process activity {activity_id}')
+    # if 'access_token' in session:
+    #   access_token = session['access_token']
+    access_token = 'f16e2ceb5a6b2f9f62d18e9773f7439031b5b58d'
+    headers = {'Authorization': f'Bearer {access_token}'}
+    params = {'include_all_efforts': False}
+    print("what's happening")
+    resp = requests.get(f'{BASE_URL}/activities/{activity_id}', headers=headers, params=params)
+    respData = resp.json()
+    gearDeets = respData['gear']
+    print(f'hello? {gearDeets}')
+    if respData['gear']['primary'] == True: 
+        print("you used your primary gear! no email needed :)")
+    else:
+        print("this should fire an email to check your gear!")
 
+    
+async def process(activity_id):
+    print('hey gurl')
+
+@app.route('/test-email')
+def test_email():
+    msg = Message('Hello from strava gear updater', sender = 'stravagearupdater@gmail.com', recipients = ['charlotte.bourg@gmail.com'])
+    msg.body = "testing from flask-mail"
+    mail.send(msg)
+    return "sent"
 
 if __name__ == '__main__':
     # connect_to_db(app)
