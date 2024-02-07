@@ -15,7 +15,6 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, 
                         autoincrement = True,
                         primary_key = True)
-    strava_athlete_id = db.Column(db.Integer, unique = True)
     email = db.Column(db.String, unique = True)
     password_hash = db.Column(db.String, nullable=False)
     created_on = db.Column(db.DateTime, nullable=False)
@@ -25,8 +24,8 @@ class User(UserMixin, db.Model):
         self.password_hash = generate_password_hash(password)
         self.created_on = datetime.now()
 
-    access_tokens = db.relationship("AccessToken", back_populates = "athlete")
-    refresh_tokens = db.relationship("RefreshToken", back_populates = "athlete")
+    access_tokens = db.relationship("AccessToken", back_populates = "user")
+    refresh_tokens = db.relationship("RefreshToken", back_populates = "user")
 
     def __repr__(self):
         return f'<User id = {self.id} email = {self.email}>'
@@ -41,10 +40,11 @@ class AccessToken(db.Model):
                         primary_key = True)
     code = db.Column(db.String)
     scope_activity_read_all = db.Column(db.Boolean)
+    scope_profile_read_all = db.Column(db.Boolean)
     expires_at = db.Column(db.DateTime)
-    athlete_id = db.Column(db.Integer, db.ForeignKey("users.strava_athlete_id"))
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
 
-    athlete = db.relationship("User", back_populates = "access_tokens")
+    user = db.relationship("User", back_populates = "access_tokens")
 
     def __repr__(self):
         return f'<AccessToken code = {self.code}>'
@@ -59,9 +59,10 @@ class RefreshToken(db.Model):
                         primary_key = True)
     code = db.Column(db.String)
     scope_activity_read_all = db.Column(db.Boolean)
-    athlete_id = db.Column(db.Integer, db.ForeignKey("users.strava_athlete_id"))
+    scope_profile_read_all = db.Column(db.Boolean)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
 
-    athlete = db.relationship("User", back_populates = "refresh_tokens")
+    user = db.relationship("User", back_populates = "refresh_tokens")
 
     def __repr__(self):
         return f'<RefreshToken code = {self.code}>'

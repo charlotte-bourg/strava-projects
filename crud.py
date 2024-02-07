@@ -1,6 +1,7 @@
 """Create, read, update, delete operations"""
-from model import db, User, connect_to_db
+from model import db, User, AccessToken, RefreshToken, connect_to_db
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timedelta
 
 def get_user_by_id(id):
     """Retrieve user by id."""
@@ -19,6 +20,24 @@ def set_password(user, password):
 
 def check_password(user, password):
     return check_password_hash(user.password_hash, password)
+
+def create_access_token(code, scope_activity_read_all, scope_profile_read_all, expires_at, user_id):
+    access_token = AccessToken(code = code, scope_activity_read_all = scope_activity_read_all, scope_profile_read_all = scope_profile_read_all, expires_at = expires_at, user_id = user_id) 
+    return access_token 
+
+def create_refresh_token(code, scope_activity_read_all, scope_profile_read_all, user_id):
+    refresh_token = RefreshToken(code = code, scope_activity_read_all = scope_activity_read_all, scope_profile_read_all = scope_profile_read_all, user_id = user_id) 
+    return refresh_token
+
+def user_has_active_access_token(user_id):
+    token = get_access_token(user_id)
+    return token.expires_at < datetime.now() - timedelta(minutes = 5)
+
+def get_access_token(user_id):
+    return AccessToken.query.filter_by(user_id = user_id).one()
+
+def get_refresh_token(user_id):
+    return RefreshToken.query.filter_by(user_id = user_id).one()
 
 if __name__ == '__main__':
     from server import app

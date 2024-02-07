@@ -6,9 +6,10 @@ from flask import Flask, flash, render_template, request, redirect, session, jso
 from flask_mail import Mail, Message
 from celery import Celery, Task
 import logging 
-from flask_login import LoginManager, login_user, logout_user
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import crud
 from model import db, connect_to_db
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.secret_key = os.environ['FLASK_KEY']
@@ -52,7 +53,7 @@ TOKEN_URL = 'https://www.strava.com/api/v3/oauth/token'
 DEAUTHORIZE_URL = 'https://www.strava.com/oauth/deauthorize'
 
 # Permission scopes for Strava authentication 
-SCOPES = 'activity:read_all'
+SCOPES = 'activity:read_all,profile:read_all'
 
 # flask-mail configuration
 app.config['MAIL_SERVER']='smtp.gmail.com'
@@ -113,7 +114,9 @@ def authenticate():
     return redirect(f'{AUTHORIZE_URL}?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={SCOPES}')
 
 @app.route('/update-gear/callback')
+@login_required
 def callback():
+    user = current_user 
     err = request.args.get('error', '')
     if err: 
         flash("Can't set up gear updater without your Strava authentication")
@@ -122,6 +125,8 @@ def callback():
     # Handle the callback from Strava after user authorization
     code = request.args.get('code')
     scopes = request.args.get('scope')
+    scope_activity_read_all = "activity:read_all" in scopes
+    scope_profile_read_all = "profile:read_all" in scopes
 
     # Exchange the authorization code for access and refresh tokens
     data = {
@@ -135,13 +140,12 @@ def callback():
 
     if response.status_code == 200:
         token_data = response.json()
-        print(token_data)
-        # TODO move to db
-        expiration = token_data['expires_at']
-        session['access_token'] = token_data['access_token']
-        session['refresh_token'] = token_data['refresh_token']
-        print('your session data is as follows')
-        print(session)
+        expiration_offset = token_data['expires_in']
+        expires_at = datetime.now() + timedelta(seconds = expiration_offset)
+        access_token = crud.create_access_token(token_data['access_token'], scope_activity_read_all, scope_profile_read_all, expires_at, user.id)
+        refresh_token = crud.create_refresh_token(token_data['refresh_token'], scope_activity_read_all, scope_profile_read_all, user.id)
+        db.session.add_all([access_token, refresh_token])
+        db.session.commit()
         return f'Authentication successful! Welcome {token_data["athlete"]["firstname"]}!'
 
     return 'Authentication failed.'
@@ -169,13 +173,29 @@ def webhook():
         return "Invalid request"
 
 @celery.task
+@login_required
 def process_new_activity(data):
+    user = current_user
     activity_id = data['object_id']
     print(f'hey! thanks for telling me to process activity {activity_id}')
-    if 'access_token' in session:
-        print("yea!")
-    access_token = "a51ca2b9c4d8342b8289f27a8c270369dc4abd40"
-    headers = {'Authorization': f'Bearer {access_token}'}
+    if crud.user_has_active_access_token(user.id):
+        access_token = crud.get_access_token(user.id)
+    else: 
+        refresh_token = crud.get_refresh_token(user.id)
+        data = {
+            'client_id': CLIENT_ID,
+            'client_secret': CLIENT_SECRET,
+            'grant_type': 'refresh_token',
+            'refresh_token': refresh_token.code,
+        }
+        response = requests.post(TOKEN_URL, data=data)
+        expiration_offset = response['expires_in']
+        expires_at = datetime.now() + timedelta(seconds = expiration_offset)
+        access_token.expires_at = expires_at
+        access_token.code = response['access_token']
+        refresh_token.code = response['refresh_token']
+        db.session.commit()
+    headers = {'Authorization': f'Bearer {access_token.code}'}
     params = {'include_all_efforts': False}
     resp = requests.get(f'{BASE_URL}/activities/{activity_id}', headers=headers, params=params)
     respData = resp.json()
@@ -188,8 +208,8 @@ def process_new_activity(data):
     # else: 
     #     print("can't process activity without access token!")
 
-def send_email():
-    msg = Message('Hello from strava gear updater', sender = 'stravagearupdater@gmail.com', recipients = ['charlotte.bourg@gmail.com'])
+def send_email(recipient_address):
+    msg = Message('Hello from strava gear updater', sender = 'stravagearupdater@gmail.com', recipients = [recipient_address])
     msg.body = "testing from flask-mail"
     mail.send(msg)
     return "sent"
