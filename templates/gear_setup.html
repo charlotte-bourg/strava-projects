@@ -1,15 +1,70 @@
 {% extends 'base.html' %}
 {% block body %}
 
+<!-- Display user's shoes dynamically -->
 {% for shoe in shoes %}
     {{ shoe.name }} 
         {% if shoe.nickname %}
             ({{ shoe.nickname }})
         {% endif %}
+    
+    <form id="default-form">
+        <input type="checkbox" id="run" name="run">
+        <label for="run">Run</label>
+        
+        <input type="checkbox" id="trailrun" name="trailrun">
+        <label for="trailrun">Trail Run</label>
+        
+        <input type="checkbox" id="walk" name="walk">
+        <label for="walk">Walk</label>
+        
+        <input type="checkbox" id="hike" name="hike">
+        <label for="hike">Hike</label>
+        
+        <input type="checkbox" id="virtualrun" name="virtualrun">
+        <label for="virtualrun">Virtual Run</label>
+        
+        <button type="submit">Set as Default</button>
+    </form>
     <br> 
 {% endfor %}
+
+
+<!-- Script to handle AJAX request and update shoe list -->
+<script>
+    // Event listener for default selection form submission
+    document.getElementById('default-form').addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        // Get selected shoe and activity type
+        // let shoeId = document.getElementById('shoe-select').value;
+        // let activityTypeId = document.getElementById('activity-type-select').value;
+
+        // Make an AJAX request to mark shoe as default for activity type
+        fetch('/set_default_shoe', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                shoe_id: shoeId,
+                activity_type_id: activityTypeId
+            })
+        })
+        .then(response => {
+            if (response.ok) {
+                alert('Shoe marked as default for activity type successfully!');
+            } else {
+                alert('Error marking shoe as default for activity type!');
+            }
+        })
+        .catch(error => console.error('Error marking shoe as default:', error));
+    });
+
+</script>
+
 <br> 
 <br>
-You can navigate to <a href=https://www.strava.com/settings/gear>your strava gear page</a> for reference. 
+You can navigate to <a href="https://www.strava.com/settings/gear">your Strava gear page</a> for reference. 
 
 {% endblock %}

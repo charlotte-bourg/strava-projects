@@ -32,7 +32,34 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return f'<User id = {self.id} email = {self.email}>'
+
+class ActivityType(db.Model):
+    """Model for activity types."""
     
+    __tablename__ = "activity_types"
+    
+    id = db.Column(db.Integer, autoincrement=True, primary_key=True)
+    name = db.Column(db.String, unique=True)
+    
+    def __repr__(self):
+        return f'<ActivityType id={self.id} name={self.name}>'
+
+
+class DefaultShoe(db.Model):
+    """Association table for default shoes and activity types."""
+    
+    __tablename__ = "default_shoes"
+    
+    id = db.Column(db.Integer, autoincrement=True, primary_key=True)
+    shoe_id = db.Column(db.Integer, db.ForeignKey("shoes.id"))
+    activity_type_id = db.Column(db.Integer, db.ForeignKey("activity_types.id"))
+    
+    shoe = db.relationship("Shoe", backref="default_shoes")
+    activity_type = db.relationship("ActivityType", backref="default_shoes")
+    
+    __table_args__ = (db.UniqueConstraint('shoe_id', 'activity_type_id'),)
+
+
 class Shoe(db.Model):
     """A shoe from strava gear."""
 
