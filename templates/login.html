@@ -1,12 +1,16 @@
-{% extends "base.html" %}
-
+{% extends 'base.html' %}
 {% block body %}
+
     <h1>Login</h1>
     <form method="POST" action="/login">
         <label for="email">Email:</label>
         <input type="text" id="email" name="email" required><br>
         <label for="password">Password:</label>
         <input type="password" id="password" name="password" required><br>
+        <label for="remember">Remeber me</label>
+        <input type="checkbox" id="remember" name="remember"><br>
         <button type="submit">Login</button>
     </form>
+
+    <a href='/sign-up'>Sign up for a new account</a></li>
 {% endblock %}

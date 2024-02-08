@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block body %}
+
+{% for shoe in shoes %}
+    {{ shoe.name }} 
+        {% if shoe.nickname %}
+            ({{ shoe.nickname }})
+        {% endif %}
+    <br> 
+{% endfor %}
+<br> 
+<br>
+You can navigate to <a href=https://www.strava.com/settings/gear>your strava gear page</a> for reference. 
+
+{% endblock %}

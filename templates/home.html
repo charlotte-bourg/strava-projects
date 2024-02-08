@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block body %}
+
+Welcome!
+
+Now it's time to set up your default gear!
+
+<form method="POST" action="/retrieve-gear">
+    <button type="submit" class="btn btn-primary">Retrieve my gear</button>
+</form>
+
+{% endblock %}
