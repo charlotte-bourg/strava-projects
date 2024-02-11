@@ -15,6 +15,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, 
                         autoincrement = True,
                         primary_key = True)
+    strava_id = db.Column(db.Integer)
     email = db.Column(db.String, unique = True)
     password_hash = db.Column(db.String, nullable=False)
     created_on = db.Column(db.DateTime, nullable=False)
@@ -29,6 +30,7 @@ class User(UserMixin, db.Model):
     access_tokens = db.relationship("AccessToken", back_populates = "user")
     refresh_tokens = db.relationship("RefreshToken", back_populates = "user")
     shoes = db.relationship("Shoe", back_populates = "user")
+    default_shoes = db.relationship("DefaultShoe", back_populates = "user")
 
     def __repr__(self):
         return f'<User id = {self.id} email = {self.email}>'
@@ -53,12 +55,16 @@ class DefaultShoe(db.Model):
     id = db.Column(db.Integer, autoincrement=True, primary_key=True)
     shoe_id = db.Column(db.Integer, db.ForeignKey("shoes.id"))
     activity_type_id = db.Column(db.Integer, db.ForeignKey("activity_types.id"))
-    
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+
     shoe = db.relationship("Shoe", backref="default_shoes")
     activity_type = db.relationship("ActivityType", backref="default_shoes")
+    user =  db.relationship("User", back_populates = "default_shoes")
     
     __table_args__ = (db.UniqueConstraint('shoe_id', 'activity_type_id'),)
 
+    def __repr__(self):
+        return f'<ActivityType id={self.id} name={self.name}>'
 
 class Shoe(db.Model):
     """A shoe from strava gear."""

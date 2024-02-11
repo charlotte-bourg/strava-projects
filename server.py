@@ -156,32 +156,63 @@ def callback():
         expires_at = datetime.now() + timedelta(seconds = expiration_offset)
         access_token = crud.create_access_token(token_data['access_token'], scope_activity_read_all, scope_profile_read_all, expires_at, user.id)
         refresh_token = crud.create_refresh_token(token_data['refresh_token'], scope_activity_read_all, scope_profile_read_all, user.id)
+        user.strava_id = token_data['athlete']['id']
         db.session.add_all([access_token, refresh_token])
         db.session.commit()
         return redirect('/home')
 
     return 'Authentication failed.'
 
-@app.route('/retrieve-gear', methods=['POST'])
+@app.route('/retrieve-gear')
 @login_required
 def retrieve_gear():
     user = current_user
-    access_token_code = retrieve_valid_access_code(user)
+    access_token_code = retrieve_valid_access_code(user.id)
     headers = {'Authorization': f'Bearer {access_token_code}'}
     resp = requests.get(f'{BASE_URL}/athlete', headers=headers)
     resp = resp.json() 
+    print(resp)
     shoes = resp.get('shoes', '')
     shoe_objects = []
     active_shoes = []
     for shoe in shoes: 
         print(shoe)
-        shoe_obj = crud.create_shoe(shoe['id'], shoe['name'], shoe['nickname'], shoe['retired'], user.id)
-        shoe_objects.append(shoe_obj)
+        if crud.get_shoe_by_strava_id(shoe['id']):
+            shoe_obj = crud.get_shoe_by_strava_id(shoe['id'])
+            if shoe_obj.name != shoe['name']:
+                shoe_obj.name = shoe['name']
+            if shoe_obj.retired != shoe['retired']:
+                shoe_obj.retired = shoe['retired']
+                # if a shoe is retired, it won't be returned with athlete, handle that
+                print('HEY theres a discrepancy in shoe retirement')
+            if shoe_obj.nickname != shoe['nickname']:
+                shoe_obj.nickname = shoe['nickname']
+        else: 
+            shoe_obj = crud.create_shoe(shoe['id'], shoe['name'], shoe['nickname'], shoe['retired'], user.id)
+            shoe_objects.append(shoe_obj)
         if not shoe_obj.retired:
             active_shoes.append(shoe_obj)
     db.session.add_all(shoe_objects)
     db.session.commit()
-    return render_template('gear_setup.html', shoes=active_shoes)
+    print(active_shoes)
+    return render_template('gear_setup.html', shoes = active_shoes)
+
+@app.route('/set-default-gear', methods=['POST'])
+@login_required
+def update_default_gear():
+    shoe_id = request.json['shoe_id']
+    activity_types = request.json['activity_types']
+    print(activity_types)
+    print(shoe_id)
+
+    # checks and unchecks 
+    # if any other gear is default for that activity for that user, un chekc
+    # if 
+    # shoe_id = request.form['shoe_id']
+    # activity_types = request.form['activity_types']
+    # print(f"HEYYYYYY!!!!!!!! set {shoe_id} as default for {activity_types}")
+    return {
+        "success": True}
 
 @app.route('/home')
 @login_required
@@ -206,18 +237,21 @@ def webhook():
     elif request.method == 'POST':
         data = request.get_json()
         print("we got a post request on our webhook")
-        process_new_activity.delay(data)
+        user = crud.get_user_by_strava_id(data['owner_id'])
+        process_new_activity.delay(data, user.id, user.email)
+        print(data)
         return jsonify({"status": "success"})
     else:
         return "Invalid request"
 
-def retrieve_valid_access_code(user):
-    if crud.user_has_active_access_token(user.id): 
-        access_token = crud.get_access_token(user.id)
-
+def retrieve_valid_access_code(user_id):
+    if crud.user_has_active_access_token(user_id): 
+        access_token = crud.get_access_token(user_id)
+        print(f"existing access code: {access_token.code}")
     # use refresh token to retrieve new access token 
     else: 
-        refresh_token = crud.get_refresh_token(user.id)
+        print("exchanging for new access token")
+        refresh_token = crud.get_refresh_token(user_id)
 
         data = {
             'client_id': CLIENT_ID,
@@ -232,7 +266,7 @@ def retrieve_valid_access_code(user):
         # process response to update codes and expiration time in database
         expiration_offset = response['expires_in']
         expires_at = datetime.now() + timedelta(seconds = expiration_offset)
-        access_token = crud.get_access_token(user.id)
+        access_token = crud.get_access_token(user_id)
         access_token.expires_at = expires_at
         access_token.code = response['access_token']
         refresh_token.code = response['refresh_token']
@@ -242,30 +276,44 @@ def retrieve_valid_access_code(user):
     return access_token.code
 
 @celery.task
-@login_required
-def process_new_activity(data):
-    user = current_user
-    activity_id = data['object_id']
-    print(f'hey! thanks for telling me to process activity {activity_id}')
-    access_token_code = retrieve_valid_access_code(user)
-    headers = {'Authorization': f'Bearer {access_token_code}'}
-    params = {'include_all_efforts': False}
-    resp = requests.get(f'{BASE_URL}/activities/{activity_id}', headers=headers, params=params)
-    respData = resp.json()
-    gearDeets = respData['gear']
-    print(f'hello? {gearDeets}')
-    if respData['gear']['primary'] == True: 
-        print("you used your primary gear! no email needed :)")
-    else:
-        print("this should fire an email to check your gear!")
-    # else: 
-    #     print("can't process activity without access token!")
+def process_new_activity(data, user_id, user_email):
+    with app.app_context():
+        print(f"HEY UR USER IS {user_id}")
+        activity_id = data['object_id']
+        print(f'hey! thanks for telling me to process activity {activity_id}')
+        access_token_code = retrieve_valid_access_code(user_id)
+        headers = {'Authorization': f'Bearer {access_token_code}'}
+        params = {'include_all_efforts': False}
+        resp = requests.get(f'{BASE_URL}/activities/{activity_id}', headers=headers, params=params)
+        respData = resp.json()
+        gearDeets = respData['gear']
+        print(f'hello? {gearDeets}')
+        if respData['gear']['primary'] == True: 
+            print("you used your primary gear! no email needed :)")
+        else:
+            print("this should fire an email to check your gear!")
+            send_email(user_email, data)
+        # else: 
+        #     print("can't process activity without access token!")
 
-def send_email(recipient_address):
-    msg = Message('Hello from strava gear updater', sender = 'stravagearupdater@gmail.com', recipients = [recipient_address])
-    msg.body = "testing from flask-mail"
+def send_email(recipient_address, data):
+    sport_type = data['sport_type']
+    activity_date = datetime.fromisoformat(data['start_date_local']).date
+    msg = Message(f'Check your gear on your {sport_type} on {activity_date}', sender = 'stravagearupdater@gmail.com', recipients = [recipient_address])
+    msg.body = f"Hello athlete!<br> \
+        You logged a {sport_type} on {activity_date} using your default gear, .<br> \
+        If that's the gear you used, you can ignore this message! \
+        Otherwise, this is your reminder to update your gear. \
+        You can update your gear in Strava or use the buttons below."
+
     mail.send(msg)
     return "sent"
+
+@app.route('/update-activity-gear', methods=['PUT']) 
+@login_required
+def update_activity_gear():
+    request.form.get(activity)
+
 
 if __name__ == '__main__':
     connect_to_db(app)

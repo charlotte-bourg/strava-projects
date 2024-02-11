@@ -1,70 +1,75 @@
 {% extends 'base.html' %}
 {% block body %}
 
-<!-- Display user's shoes dynamically -->
+
 {% for shoe in shoes %}
-    {{ shoe.name }} 
-        {% if shoe.nickname %}
-            ({{ shoe.nickname }})
-        {% endif %}
-    
-    <form id="default-form">
-        <input type="checkbox" id="run" name="run">
-        <label for="run">Run</label>
-        
-        <input type="checkbox" id="trailrun" name="trailrun">
-        <label for="trailrun">Trail Run</label>
-        
-        <input type="checkbox" id="walk" name="walk">
-        <label for="walk">Walk</label>
-        
-        <input type="checkbox" id="hike" name="hike">
-        <label for="hike">Hike</label>
-        
-        <input type="checkbox" id="virtualrun" name="virtualrun">
-        <label for="virtualrun">Virtual Run</label>
-        
-        <button type="submit">Set as Default</button>
-    </form>
-    <br> 
+  <div class="modal fade" id="setDefaultsModal{{ shoe.id }}" aria-labelledby="updateDefaults" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="updateDefaults">Update default sports for {{ shoe.name }}</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>  
+        <form id="default-form-{{ shoe.id }}" class="default-form">
+            <div class="modal-body">
+            
+                <input type="checkbox" id="run-{{shoe.id}}" name="run-{{shoe.id}}">
+                <label for="run-{{shoe.id}}">Run</label>
+                &nbsp;&nbsp;
+                <input type="checkbox" id="trailrun-{{shoe.id}}" name="trailrun-{{shoe.id}}">
+                <label for="trailrun-{{shoe.id}}">Trail Run</label>
+                &nbsp;&nbsp; 
+                <input type="checkbox" id="walk-{{shoe.id}}" name="walk-{{shoe.id}}">
+                <label for="walk-{{shoe.id}}">Walk</label>
+                &nbsp;&nbsp; 
+                <input type="checkbox" id="hike-{{shoe.id}}" name="hike-{{shoe.id}}">
+                <label for="hike-{{shoe.id}}">Hike</label>
+                &nbsp;&nbsp;    
+                <input type="checkbox" id="virtualrun-{{shoe.id}}" name="virtualrun-{{shoe.id}}">
+                <label for="virtualrun-{{shoe.id}}">Virtual Run</label> 
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-primary">Save changes</button>
+            </div>
+        </form> 
+      </div>
+    </div>
+  </div>
 {% endfor %}
 
+<h1>My Shoes</h1>
+<table class="table">
+    <tr> 
+        <th>Default Sports</th>
+        <th>Shoes</th>
+    </tr>
+    {% for shoe in shoes %}
+    <tr> 
+        <td>
 
-<!-- Script to handle AJAX request and update shoe list -->
-<script>
-    // Event listener for default selection form submission
-    document.getElementById('default-form').addEventListener('submit', function(event) {
-        event.preventDefault();
+        </td>
 
-        // Get selected shoe and activity type
-        // let shoeId = document.getElementById('shoe-select').value;
-        // let activityTypeId = document.getElementById('activity-type-select').value;
+        <td> 
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#setDefaultsModal{{ shoe.id }}">
+                {{ shoe.name }} 
 
-        // Make an AJAX request to mark shoe as default for activity type
-        fetch('/set_default_shoe', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                shoe_id: shoeId,
-                activity_type_id: activityTypeId
-            })
-        })
-        .then(response => {
-            if (response.ok) {
-                alert('Shoe marked as default for activity type successfully!');
-            } else {
-                alert('Error marking shoe as default for activity type!');
-            }
-        })
-        .catch(error => console.error('Error marking shoe as default:', error));
-    });
+                {% if shoe.nickname %}
 
-</script>
+                    ({{ shoe.nickname }})
+
+                {% endif %}
+            </button>
+            
+        </td>
+    {% endfor %}
+</table>
+
+<script src="/static/js/gear_setup.js"></script> 
 
 <br> 
 <br>
+
 You can navigate to <a href="https://www.strava.com/settings/gear">your Strava gear page</a> for reference. 
 
 {% endblock %}
