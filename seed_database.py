@@ -1,4 +1,4 @@
-"""Script to seed database."""
+"""Script to seed the database."""
 
 import os
 import json
@@ -9,12 +9,19 @@ import crud
 from model import connect_to_db, db, ActivityType
 import server
 
+# Drop and recreate the database
 os.system("dropdb gearupdaterdb")
 os.system("createdb gearupdaterdb")
 
+# Connect to the database and create tables
 connect_to_db(server.app)
 server.app.app_context().push()
 db.create_all()
 
-db.session.add_all([ActivityType(name="Run"), ActivityType(name="Trail Run"), ActivityType(name="Walk"), ActivityType(name="Hike"), ActivityType(name="Virtual Run")])
+# Seed activity types into the database
+activity_types = ["Run", "Trail Run", "Walk", "Hike", "Virtual Run"]
+
+for activity_type in activity_types:
+    db.session.add(ActivityType(name=activity_type))
+
 db.session.commit()

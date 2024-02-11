@@ -1,11 +1,11 @@
-"""Server for running helper app."""
+"""Server for the running helper app."""
 
-import os 
+import os
 import requests
-from flask import Flask, flash, render_template, request, redirect, session, jsonify 
+from flask import Flask, flash, render_template, request, redirect, session, jsonify
 from flask_mail import Mail, Message
 from celery import Celery, Task
-import logging 
+import logging
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import crud
 from model import db, connect_to_db
@@ -14,11 +14,11 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 app.secret_key = os.environ['FLASK_KEY']
 
-# flask-login setup
+# Flask-Login setup
 login_manager = LoginManager()
 login_manager.init_app(app)
 
-# Celery setup 
+# Celery setup
 def celery_init_app(app: Flask) -> Celery:
     class FlaskTask(Task):
         def __call__(self, *args: object, **kwargs: object) -> object:
@@ -40,23 +40,23 @@ app.config.from_mapping(
 celery = celery_init_app(app)
 celery.log.setup(loglevel=logging.DEBUG)
 
-# Retrieve secrets 
+# Retrieve secrets
 CLIENT_ID = os.environ['CLIENT_ID']
 CLIENT_SECRET = os.environ['CLIENT_SECRET']
 REDIRECT_URI = os.environ['REDIRECT_URI']
 STRAVA_VERIFY_TOKEN = os.environ['STRAVA_VERIFY_TOKEN']
 
-# Strava endpoints 
+# Strava endpoints
 BASE_URL = 'https://www.strava.com/api/v3'
 AUTHORIZE_URL = 'https://www.strava.com/oauth/authorize'
 TOKEN_URL = 'https://www.strava.com/api/v3/oauth/token'
 DEAUTHORIZE_URL = 'https://www.strava.com/oauth/deauthorize'
 
-# Permission scopes for Strava authentication 
+# Permission scopes for Strava authentication
 SCOPES = 'activity:read_all,profile:read_all'
 
-# flask-mail configuration
-app.config['MAIL_SERVER']='smtp.gmail.com'
+# Flask-Mail configuration
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USERNAME'] = 'stravagearupdater@gmail.com'
 app.config['MAIL_PASSWORD'] = os.environ['EMAIL_PASS']
@@ -65,23 +65,28 @@ app.config['MAIL_USE_SSL'] = True
 mail = Mail(app)
 
 @app.route('/')
-def login_entry(): 
+def login_entry():
+    """Display login page."""
     return render_template('login.html')
 
 @app.route('/update-gear')
 def updateGear():
+    """Display gear update page."""
     return render_template('update-gear.html')
 
 @login_manager.user_loader
 def load_user(user_id):
+    """Load user for Flask-Login."""
     return crud.get_user_by_id(user_id)
 
 @app.route('/sign-up')
 def display_sign_up():
+    """Display sign-up page."""
     return render_template('sign-up.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    """Handle user login."""
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
@@ -92,7 +97,7 @@ def login():
             return redirect('/sign-up')
         if user and crud.check_password(user, password):
             login_user(user, remember=remember)
-            flash("logged in!")
+            flash("Logged in!")
             if crud.strava_authenticated(user.id):
                 return redirect('/home')
             return redirect('/update-gear/strava-auth')
@@ -103,12 +108,14 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
+    """Handle user logout."""
     logout_user()
-    flash("logged out!")
+    flash("Logged out!")
     return redirect('/')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    """Handle user registration."""
     if request.method == 'POST':
         email = request.form['email']
         if crud.get_user_by_email(email):
@@ -123,11 +130,13 @@ def register():
 
 @app.route('/update-gear/strava-auth')
 def authenticate():
+    """Redirect to Strava authentication."""
     return redirect(f'{AUTHORIZE_URL}?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={SCOPES}')
 
 @app.route('/update-gear/callback')
 @login_required
 def callback():
+    """Handle callback from Strava after authentication."""
     user = current_user 
     err = request.args.get('error', '')
     if err: 
@@ -166,6 +175,7 @@ def callback():
 @app.route('/retrieve-gear')
 @login_required
 def retrieve_gear():
+    """Retrieve gear data from Strava."""
     user = current_user
     access_token_code = retrieve_valid_access_code(user.id)
     headers = {'Authorization': f'Bearer {access_token_code}'}
@@ -200,14 +210,15 @@ def retrieve_gear():
 @app.route('/set-default-gear', methods=['POST'])
 @login_required
 def update_default_gear():
+    """Update default gear settings."""
     shoe_id = request.json['shoe_id']
     activity_types = request.json['activity_types']
     print(activity_types)
     print(shoe_id)
 
-    # checks and unchecks 
-    # if any other gear is default for that activity for that user, un chekc
-    # if 
+    # Checks and unchecks
+    # If any other gear is default for that activity for that user, uncheck
+    # If...
     # shoe_id = request.form['shoe_id']
     # activity_types = request.form['activity_types']
     # print(f"HEYYYYYY!!!!!!!! set {shoe_id} as default for {activity_types}")
@@ -217,10 +228,12 @@ def update_default_gear():
 @app.route('/home')
 @login_required
 def logged_in_home(): 
+    """Display home page for logged-in user."""
     return render_template('home.html')
 
 @app.route('/webhook', methods=['GET','POST'])
 def webhook():
+    """Handle Strava webhook."""
     if request.method == 'GET':
         print("hello :)")
         hub_challenge = request.args.get('hub.challenge', '')
@@ -245,10 +258,11 @@ def webhook():
         return "Invalid request"
 
 def retrieve_valid_access_code(user_id):
+    """Retrieve a valid access code."""
     if crud.user_has_active_access_token(user_id): 
         access_token = crud.get_access_token(user_id)
         print(f"existing access code: {access_token.code}")
-    # use refresh token to retrieve new access token 
+    # Use refresh token to retrieve new access token 
     else: 
         print("exchanging for new access token")
         refresh_token = crud.get_refresh_token(user_id)
@@ -260,10 +274,10 @@ def retrieve_valid_access_code(user_id):
             'refresh_token': refresh_token.code,
         }
 
-        response = requests.post(TOKEN_URL, data=data) # make request for new access code
+        response = requests.post(TOKEN_URL, data=data)  # Make request for new access code
         response = response.json()
 
-        # process response to update codes and expiration time in database
+        # Process response to update codes and expiration time in database
         expiration_offset = response['expires_in']
         expires_at = datetime.now() + timedelta(seconds = expiration_offset)
         access_token = crud.get_access_token(user_id)
@@ -277,6 +291,7 @@ def retrieve_valid_access_code(user_id):
 
 @celery.task
 def process_new_activity(data, user_id, user_email):
+    """Process new Strava activity."""
     with app.app_context():
         print(f"HEY UR USER IS {user_id}")
         activity_id = data['object_id']
@@ -297,6 +312,7 @@ def process_new_activity(data, user_id, user_email):
         #     print("can't process activity without access token!")
 
 def send_email(recipient_address, data):
+    """Send email notification."""
     sport_type = data['sport_type']
     activity_date = datetime.fromisoformat(data['start_date_local']).date
     msg = Message(f'Check your gear on your {sport_type} on {activity_date}', sender = 'stravagearupdater@gmail.com', recipients = [recipient_address])
@@ -312,8 +328,8 @@ def send_email(recipient_address, data):
 @app.route('/update-activity-gear', methods=['PUT']) 
 @login_required
 def update_activity_gear():
+    """Update activity gear settings."""
     request.form.get(activity)
-
 
 if __name__ == '__main__':
     connect_to_db(app)
