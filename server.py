@@ -58,7 +58,7 @@ SCOPES = 'activity:read_all,profile:read_all'
 # Flask-Mail configuration
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 465
-app.config['MAIL_USERNAME'] = 'stravagearupdater@gmail.com'
+app.config['MAIL_USERNAME'] = os.environ['SENDING_ADDRESS']
 app.config['MAIL_PASSWORD'] = os.environ['EMAIL_PASS']
 app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USE_SSL'] = True
