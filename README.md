@@ -39,5 +39,8 @@ TODO
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Contact Information
-Charlotte Bourg
-charlotte.bourg@gmail.com
+Developer: Charlotte Bourg (she/her)
+[Email](mailto:charlotte.bourg@gmail.com)
+[LinkedIn](https://www.linkedin.com/in/charlottebourg/)
+[GitHub](https://github.com/charlotte-bourg)
+[Strava](https://www.strava.com/athletes/100636324)
