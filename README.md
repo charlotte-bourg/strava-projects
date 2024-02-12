@@ -26,7 +26,75 @@ Solution:
 ## Installation
 This app isn't deployed yet. To run it locally, follow the installation instructions below: 
 
-TODO 
+### Prerequisites
+
+- Python installed on your local machine. You can download Python from [python.org](https://www.python.org/downloads/).
+- Git installed on your local machine. You can download Git from [git-scm.com](https://git-scm.com/downloads).
+
+### Running Locally
+
+1. **Clone the Repository:**
+   ```bash
+   $ git clone https://github.com/charlotte-bourg/running-helper/
+   ```
+2. **Navigate to the Project Directory:**
+   ```bash
+   $ cd running-helper
+   ```
+4. **Create and Activate a Virtual Environment:**
+   ```bash
+   $ python venv env
+   ```
+   Activate on Windows:
+   ```bash
+   env\Scripts\activate
+   ```
+   Activate on macOS and Linux:
+   ```bash
+   source env/bin/activate
+   ```
+6. **Install Requirements:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+   This command installs all the required dependencies listed in the requirements.txt file 
+8. **Set Up Email Address to Serve as Sender:**
+   Create an gmail address to serve as the sender for your email reminders. 
+10. **Set Up Strava API Details:**
+11. **Create secrets.sh file:**
+    Use the template in secrets_example.sh to update the secrets you'll need to run the app. 
+13. **Start ngrok:**
+    ```bash
+    ngrok http 5000
+    ```
+15. **Update callback url in secrets.sh:** 
+16. **Set Up Webhook Subscription:**
+    ```bash
+    source secrets.sh
+    python3 -i webhook_subscription.py
+    >>> create_webhook_subscription()
+    ```
+17. **Create Database:**
+    ```bash
+    source secrets.sh
+    python3 seed_database.py
+    ```
+18. **Install redis as needed, and start it:**
+    ```bash
+    sudo apt install redis-server
+    sudo service redis-server start
+    ```
+20. **Start Celery worker:**
+    ```bash
+    celery -A server.celery worker --loglevel=info
+    ```
+21. **Start the Application:**
+    ```bash
+    source secrets.sh
+    python3 server.py
+    ```
+22. **Access the Application:**
+    Navigate to localhost:5000
 
 ## Features
 TODO
