@@ -9,7 +9,7 @@ A web app for runners. V1 is an app for Strava users to sign up for email notifi
 - [Contact Information](#contact-information)
 
 ## Use Case Background
-Background
+Background:
 - Strava says they're the world's #1 fitness app, used by hobbyists to elite athletes for tracking and sharing workout data
 - Strava can help users track mileage on their shoes by associating shoes worn with an activity
 - Tracking mileage helps runners know when to replace a pair of shoes, which can prevent injuries

@@ -67,46 +67,35 @@ mail = Mail(app)
 SHOE_ACTIVITIES = {'Run', 'VirtualRun', 'TrailRun', 'Hike', 'Walk'}
 USER_FRIENDLY_SPORT_NAMES = {'Run': 'run', 'VirtualRun': 'virtual run', 'TrailRun': 'trail run', 'Hike': 'hike', 'Walk': 'walk'}
 
-@app.route('/')
-def login_entry():
-    """Display login page."""
-    return render_template('login.html')
-
-@app.route('/update-gear')
-def updateGear():
-    """Display gear update page."""
-    return render_template('update-gear.html')
-
+# user handling routes 
 @login_manager.user_loader
 def load_user(user_id):
     """Load user for Flask-Login."""
     return crud.get_user_by_id(user_id)
 
-@app.route('/sign-up')
-def display_sign_up():
-    """Display sign-up page."""
-    return render_template('sign-up.html')
+@app.route('/')
+def login_entry():
+    """Display login page."""
+    return render_template('login.html')
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['POST'])
 def login():
     """Handle user login."""
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-        remember = True if request.form.get('remember') else False
-        user = crud.get_user_by_email(email) 
-        if not user:
-            flash("There's no account associated with that email!")
-            return redirect('/sign-up')
-        if user and crud.check_password(user, password):
-            login_user(user, remember=remember)
-            flash("Logged in!")
-            if crud.strava_authenticated(user.id):
-                return redirect('/home')
-            return redirect('/update-gear/strava-auth')
-        else: 
-            flash("Incorrect username/password combination")
-    return render_template('login.html')
+    email = request.form['email']
+    password = request.form['password']
+    remember = True if request.form.get('remember') else False
+    user = crud.get_user_by_email(email) 
+    if not user:
+        flash("There's no account associated with that email!")
+        return redirect('/sign-up')
+    if user and crud.check_password(user, password):
+        login_user(user, remember=remember)
+        flash("Logged in!")
+        if crud.strava_authenticated(user.id):
+            return redirect('/home')
+        return redirect('/strava-auth')
+    else: 
+        flash("Incorrect username/password combination")
 
 @app.route('/logout')
 @login_required
@@ -115,6 +104,17 @@ def logout():
     logout_user()
     flash("Logged out!")
     return redirect('/')
+
+@app.route('/sign-up')
+def display_sign_up():
+    """Display sign-up page."""
+    return render_template('sign-up.html')
+
+@app.route('/home')
+@login_required
+def logged_in_home(): 
+    """Display home page for logged-in user."""
+    return render_template('home.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -131,12 +131,13 @@ def register():
         return redirect('/login')
     return render_template('register.html')
 
-@app.route('/update-gear/strava-auth')
+# strava authentication routes
+@app.route('/strava-auth')
 def authenticate():
     """Redirect to Strava authentication."""
     return redirect(f'{AUTHORIZE_URL}?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={SCOPES}')
 
-@app.route('/update-gear/callback')
+@app.route('/callback')
 @login_required
 def callback():
     """Handle callback from Strava after authentication."""
@@ -144,7 +145,7 @@ def callback():
     err = request.args.get('error', '')
     if err: 
         flash("Can't set up gear updater without your Strava authentication")
-        return redirect('/update-gear')
+        return redirect('/strava-auth')
     
     # Handle the callback from Strava after user authorization
     code = request.args.get('code')
@@ -174,6 +175,88 @@ def callback():
         return redirect('/home')
 
     return 'Authentication failed.'
+
+@app.route('/webhook', methods=['GET','POST'])
+def webhook():
+    """Handle Strava webhook.""" 
+    # handle webhook subscription validation request 
+    if request.method == 'GET': 
+        hub_challenge = request.args.get('hub.challenge', '')
+        hub_verify_token = request.args.get('hub.verify_token', '')
+        if hub_verify_token == STRAVA_VERIFY_TOKEN:
+            return jsonify({'hub.challenge': hub_challenge})
+        elif hub_verify_token:
+            return 'Invalid verify token', 403
+        else:
+            return 'Invalid request'
+    # handle event 
+    elif request.method == 'POST':
+        # gather information required to process event 
+        data = request.get_json()
+        user = crud.get_user_by_strava_id(data['owner_id'])
+        access_token_code = retrieve_valid_access_code(user.id)
+
+        # process event asynchronously with celery task 
+        process_new_event.delay(data, user.email, access_token_code)
+
+        # acknowledge new event with status code 200 (required within 2 seconds)
+        return jsonify({"status": "success"})
+    else:
+        return "Invalid request"
+
+def retrieve_valid_access_code(user_id):
+    """Retrieve a valid access code."""
+    # return existing valid access code 
+    if crud.user_has_active_access_token(user_id): 
+        return crud.get_access_token(user_id).code 
+
+    # use refresh token to retrieve new access token 
+    token_data = refresh_tokens(user_id)
+    access_token = update_tokens_in_db(user_id, token_data)
+    return access_token.code
+
+def refresh_tokens(user_id):
+    """Use user's refresh token to retrieve updated tokens."""
+    refresh_token = crud.get_refresh_token(user_id)
+    data = {
+        'client_id': CLIENT_ID,
+        'client_secret': CLIENT_SECRET,
+        'grant_type': 'refresh_token',
+        'refresh_token': refresh_token.code,
+    }
+
+    token_response = requests.post(TOKEN_URL, data=data) 
+    token_data = token_response.json()
+    return token_data
+
+def update_tokens_in_db(user_id, token_data):
+    """Update database with new token expiration and codes and return new access token."""
+    # retrieve current tokens for user
+    refresh_token = crud.get_refresh_token(user_id)
+    access_token = crud.get_access_token(user_id)
+
+    # parse relevant data from json response from tokens API
+    access_token_code = token_data['access_token']
+    refresh_token_code = token_data['refresh_token']
+    expires_at = datetime.now() + timedelta(seconds = token_data['expires_in'])
+    
+    # update tokens 
+    access_token.expires_at = expires_at
+    access_token.code = access_token_code
+    refresh_token.code = refresh_token_code 
+
+    # add to session and commit
+    db.session.add_all([access_token,refresh_token])
+    db.session.commit()
+
+    return access_token
+
+
+# display and update gear defaults routes
+@app.route('/update-gear')
+def updateGear():
+    """Display gear update page."""
+    return render_template('update-gear.html')
 
 @app.route('/retrieve-gear')
 @login_required
@@ -227,72 +310,7 @@ def update_default_gear():
     return {
         "success": True}
 
-@app.route('/home')
-@login_required
-def logged_in_home(): 
-    """Display home page for logged-in user."""
-    return render_template('home.html')
-
-@app.route('/webhook', methods=['GET','POST'])
-def webhook():
-    """Handle Strava webhook.""" 
-    # handle webhook subscription validation request 
-    if request.method == 'GET': 
-        hub_challenge = request.args.get('hub.challenge', '')
-        hub_verify_token = request.args.get('hub.verify_token', '')
-        if hub_verify_token == STRAVA_VERIFY_TOKEN:
-            return jsonify({'hub.challenge': hub_challenge})
-        elif hub_verify_token:
-            return 'Invalid verify token', 403
-        else:
-            return 'Invalid request'
-    # handle event 
-    elif request.method == 'POST':
-        # gather information required to process event 
-        data = request.get_json()
-        user = crud.get_user_by_strava_id(data['owner_id'])
-        access_token_code = retrieve_valid_access_code(user.id)
-
-        # process event asynchronously with celery task 
-        process_new_event.delay(data, user.email, access_token_code)
-
-        # acknowledge new event with status code 200 (required within 2 seconds)
-        return jsonify({"status": "success"})
-    else:
-        return "Invalid request"
-
-def retrieve_valid_access_code(user_id):
-    """Retrieve a valid access code."""
-    if crud.user_has_active_access_token(user_id): 
-        access_token = crud.get_access_token(user_id)
-        print(f"existing access code: {access_token.code}")
-    # Use refresh token to retrieve new access token 
-    else: 
-        print("exchanging for new access token")
-        refresh_token = crud.get_refresh_token(user_id)
-
-        data = {
-            'client_id': CLIENT_ID,
-            'client_secret': CLIENT_SECRET,
-            'grant_type': 'refresh_token',
-            'refresh_token': refresh_token.code,
-        }
-
-        token_response = requests.post(TOKEN_URL, data=data)  # Make request for new access code
-        token_data = token_response.json()
-
-        # Process response to update codes and expiration time in database
-        expiration_offset = token_data['expires_in']
-        expires_at = datetime.now() + timedelta(seconds = expiration_offset)
-        access_token = crud.get_access_token(user_id)
-        access_token.expires_at = expires_at
-        access_token.code = token_data['access_token']
-        refresh_token.code = token_data['refresh_token']
-        db.session.add_all([access_token,refresh_token])
-        db.session.commit()
-
-    return access_token.code
-
+# process new activity routes 
 @celery.task
 def process_new_event(data, user_email, access_token_code):
     """Process new event from Strava webhook."""
@@ -332,12 +350,6 @@ def send_email(recipient_address, sport_type, activity_date):
     
     #send message 
     mail.send(msg)
-
-# @app.route('/update-activity-gear', methods=['PUT']) 
-# @login_required
-# def update_activity_gear():
-#     """Update activity gear settings."""
-#     request.form.get(activity)
 
 if __name__ == '__main__':
     connect_to_db(app)
