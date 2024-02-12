@@ -40,7 +40,11 @@ TODO
 
 ## Contact Information
 Developer: Charlotte Bourg (she/her)
+
 [Email](mailto:charlotte.bourg@gmail.com)
+
 [LinkedIn](https://www.linkedin.com/in/charlottebourg/)
+
 [GitHub](https://github.com/charlotte-bourg)
+
 [Strava](https://www.strava.com/athletes/100636324)
