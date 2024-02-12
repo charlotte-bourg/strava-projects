@@ -4,7 +4,7 @@ export CLIENT_SECRET=<>
 
 # route in server.py to which the user will be redirected after authentication 
 # must be within the callback domain specified by the application
-export REDIRECT_URI="http://localhost:5000/update-gear/callback"
+export REDIRECT_URI="http://localhost:5000/callback"
 
 # secret key for securely signing session cookie
 export FLASK_KEY=<>

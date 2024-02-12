@@ -7,21 +7,16 @@ for (var form of forms){
     console.log(shoeId)
     console.log('handle form submit')
     form.addEventListener('submit', (evt) =>{
+        evt.preventDefault();
         console.log('in event listener!')
-        // Array to store selected checkboxes
-        var selectedCheckboxes = [];
-
-        // Iterate over checkboxes in this form to find the selected ones
-        var checkboxes = form.querySelectorAll('input[type="checkbox"]');
-        checkboxes.forEach(function(checkbox) {
-            if (checkbox.checked) {
-                // Extract activity type from checkbox ID
-                var activityType = checkbox.id.split('-')[0]; // Extract activity type from first part of ID
-
-                // Push activity type to selectedCheckboxes array
-                selectedCheckboxes.push(activityType);
-            }
-        });
+        
+        // iterate over checked checkboxes in this form to pull activity types from value field 
+        var checkedActivityTypes = []
+        var checkboxes = document.querySelectorAll('input[type=checkbox]:checked')
+        for (var i = 0; i < checkboxes.length; i++) {
+            checkboxes[i]
+            checkedActivityTypes.push(checkboxes[i].value)
+        }
 
         // Send data to server via fetch API
         fetch('/set-default-gear', {
@@ -31,11 +26,12 @@ for (var form of forms){
             },
             body: JSON.stringify({
                 shoe_id: shoeId,
-                activity_types: selectedCheckboxes
+                activity_types: checkedActivityTypes
             })
         })
-        .then(response => {
-            if (response['success']) {
+        .then((response) => response.json())
+        .then(responseData => {
+            if (responseData['success']) {
 
             } else {
                 alert('Error updating defaults!');

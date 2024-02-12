@@ -13,24 +13,24 @@
         <form id="default-form-{{ shoe.id }}" class="default-form">
             <div class="modal-body">
             
-                <input type="checkbox" id="run-{{shoe.id}}" name="run-{{shoe.id}}">
+                <input type="checkbox" id="run-{{shoe.id}}" name="run-{{shoe.id}}" value="Run">
                 <label for="run-{{shoe.id}}">Run</label>
                 &nbsp;&nbsp;
-                <input type="checkbox" id="trailrun-{{shoe.id}}" name="trailrun-{{shoe.id}}">
+                <input type="checkbox" id="trailrun-{{shoe.id}}" name="trailrun-{{shoe.id}}" value="TrailRun">
                 <label for="trailrun-{{shoe.id}}">Trail Run</label>
                 &nbsp;&nbsp; 
-                <input type="checkbox" id="walk-{{shoe.id}}" name="walk-{{shoe.id}}">
+                <input type="checkbox" id="walk-{{shoe.id}}" name="walk-{{shoe.id}}" value="Walk">
                 <label for="walk-{{shoe.id}}">Walk</label>
                 &nbsp;&nbsp; 
-                <input type="checkbox" id="hike-{{shoe.id}}" name="hike-{{shoe.id}}">
+                <input type="checkbox" id="hike-{{shoe.id}}" name="hike-{{shoe.id}}" value="Hike">
                 <label for="hike-{{shoe.id}}">Hike</label>
                 &nbsp;&nbsp;    
-                <input type="checkbox" id="virtualrun-{{shoe.id}}" name="virtualrun-{{shoe.id}}">
+                <input type="checkbox" id="virtualrun-{{shoe.id}}" name="virtualrun-{{shoe.id}}" value="VirtualRun">
                 <label for="virtualrun-{{shoe.id}}">Virtual Run</label> 
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="submit" class="btn btn-primary">Save changes</button>
+                <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">Save changes</button>
             </div>
         </form> 
       </div>

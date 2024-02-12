@@ -116,20 +116,18 @@ def logged_in_home():
     """Display home page for logged-in user."""
     return render_template('home.html')
 
-@app.route('/register', methods=['GET', 'POST'])
+@app.route('/register', methods=['POST'])
 def register():
     """Handle user registration."""
-    if request.method == 'POST':
-        email = request.form['email']
-        if crud.get_user_by_email(email):
-            flash("There's already an account associated with that email!")
-            return redirect('/login')
-        password = request.form['password']
-        new_user = crud.create_user(email, password)
-        db.session.add(new_user)
-        db.session.commit()
-        return redirect('/login')
-    return render_template('register.html')
+    email = request.form['email']
+    if crud.get_user_by_email(email):
+        flash("There's already an account associated with that email!")
+        return redirect('/')
+    password = request.form['password']
+    new_user = crud.create_user(email, password)
+    db.session.add(new_user)
+    db.session.commit()
+    return redirect('/')
 
 # strava authentication routes
 @app.route('/strava-auth')
@@ -208,12 +206,16 @@ def retrieve_valid_access_code(user_id):
     """Retrieve a valid access code."""
     # return existing valid access code 
     if crud.user_has_active_access_token(user_id): 
+        print("using existing access token")
         return crud.get_access_token(user_id).code 
+    
 
     # use refresh token to retrieve new access token 
     token_data = refresh_tokens(user_id)
-    access_token = update_tokens_in_db(user_id, token_data)
-    return access_token.code
+    print(token_data)
+    access_token_code = update_tokens_in_db(user_id, token_data)
+    print(f"your new access token is {access_token_code}")
+    return access_token_code
 
 def refresh_tokens(user_id):
     """Use user's refresh token to retrieve updated tokens."""
@@ -240,16 +242,14 @@ def update_tokens_in_db(user_id, token_data):
     refresh_token_code = token_data['refresh_token']
     expires_at = datetime.now() + timedelta(seconds = token_data['expires_in'])
     
-    # update tokens 
+    # update token attributes 
     access_token.expires_at = expires_at
     access_token.code = access_token_code
     refresh_token.code = refresh_token_code 
-
-    # add to session and commit
     db.session.add_all([access_token,refresh_token])
     db.session.commit()
 
-    return access_token
+    return access_token_code
 
 
 # display and update gear defaults routes
@@ -267,6 +267,7 @@ def retrieve_gear():
     headers = {'Authorization': f'Bearer {access_token_code}'}
     athlete_details_response = requests.get(f'{BASE_URL}/athlete', headers=headers)
     athlete_details_data = athlete_details_response.json() 
+    print(athlete_details_data)
     shoes = athlete_details_data.get('shoes', '')
     shoe_objects = []
     active_shoes = []
@@ -296,19 +297,39 @@ def retrieve_gear():
 @login_required
 def update_default_gear():
     """Update default gear settings."""
+    user = current_user
+    
     shoe_id = request.json['shoe_id']
     activity_types = request.json['activity_types']
-    print(activity_types)
-    print(shoe_id)
 
-    # Checks and unchecks
-    # If any other gear is default for that activity for that user, uncheck
-    # If...
-    # shoe_id = request.form['shoe_id']
-    # activity_types = request.form['activity_types']
-    # print(f"HEYYYYYY!!!!!!!! set {shoe_id} as default for {activity_types}")
+    print(f"HELLO should update defaults for {shoe_id} for {activity_types}")
+    
+    added_associations = {}
+    deleted_associations = {}
+    user_previous_defaults = crud.get_defaults_for_user(user.id)
+    for default in user_previous_defaults:
+        assoc_activity_name = default.activity_type.name
+        assoc_shoe_id = default.shoe_id
+        if (assoc_activity_name in activity_types and assoc_shoe_id != shoe_id) or (assoc_shoe_id == shoe_id and assoc_activity_name not in activity_types):
+            db.session.delete(default)
+            db.session.commit() 
+            deleted_associations[shoe_id] = assoc_activity_name 
+        else: 
+            activity_types.remove(assoc_activity_name)
+
+    new_default_associations = []
+    for activity_type in activity_types: 
+        print(f"the activity type is {activity_type}")
+        assoc = crud.create_default_association(shoe_id, activity_type, user.id)
+        new_default_associations.append(assoc)
+        added_associations[shoe_id] = activity_type
+    db.session.add_all(new_default_associations)
+    db.session.commit()
+
     return {
-        "success": True}
+        "success": True,
+        "addedAssociations": added_associations,
+        "deletedAssociations": deleted_associations}
 
 # process new activity routes 
 @celery.task
@@ -348,7 +369,6 @@ def send_email(recipient_address, sport_type, activity_date):
         If that's the gear you used, you can ignore this message! \
         Otherwise, this is your reminder to update your gear."
     
-    #send message 
     mail.send(msg)
 
 if __name__ == '__main__':

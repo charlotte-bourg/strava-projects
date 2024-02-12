@@ -21,10 +21,15 @@ def get_shoe_by_strava_id(strava_id):
     """Retrieve a shoe by Strava ID."""
     return Shoe.query.filter_by(strava_gear_id=strava_id).first()
 
-def create_default_association(shoe_id, activity_type_id):
+def create_default_association(shoe_id, activity_name, user_id):
     """Create a default association between a shoe and an activity type."""
-    default_shoe = DefaultShoe(shoe_id, activity_type_id)
+    activity_type_id = ActivityType.query.filter_by(name = activity_name).first().id
+    default_shoe = DefaultShoe(shoe_id = shoe_id, activity_type_id = activity_type_id, user_id = user_id)
     return default_shoe
+
+def get_defaults_for_user(user_id):
+    """Get any default associations for the user."""
+    return DefaultShoe.query.filter_by(user_id = user_id).all()
 
 # TODO
 def user_has_default_for_activity():

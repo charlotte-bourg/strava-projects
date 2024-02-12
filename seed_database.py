@@ -19,7 +19,7 @@ server.app.app_context().push()
 db.create_all()
 
 # Seed activity types into the database
-activity_types = ["Run", "Trail Run", "Walk", "Hike", "Virtual Run"]
+activity_types = ["Run", "TrailRun", "Walk", "Hike", "VirtualRun"]
 
 for activity_type in activity_types:
     db.session.add(ActivityType(name=activity_type))
