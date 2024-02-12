@@ -1,0 +1,7 @@
+celery==5.3.6
+Flask==3.0.2
+Flask_Login==0.6.3
+Flask_Mail==0.9.1
+flask_sqlalchemy==3.1.1
+Requests==2.31.0
+Werkzeug==3.0.1
