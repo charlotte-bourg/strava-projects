@@ -64,6 +64,9 @@ app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USE_SSL'] = True
 mail = Mail(app)
 
+SHOE_ACTIVITIES = {'Run', 'VirtualRun', 'TrailRun', 'Hike', 'Walk'}
+USER_FRIENDLY_SPORT_NAMES = {'Run': 'run', 'VirtualRun': 'virtual run', 'TrailRun': 'trail run', 'Hike': 'hike', 'Walk': 'walk'}
+
 @app.route('/')
 def login_entry():
     """Display login page."""
@@ -157,10 +160,10 @@ def callback():
         'grant_type': 'authorization_code', # always 'authorization_code' for initial authentication
     }
     
-    response = requests.post(TOKEN_URL, data=data)
+    token_response = requests.post(TOKEN_URL, data=data)
 
-    if response.status_code == 200:
-        token_data = response.json()
+    if token_response.status_code == 200:
+        token_data = token_response.json()
         expiration_offset = token_data['expires_in']
         expires_at = datetime.now() + timedelta(seconds = expiration_offset)
         access_token = crud.create_access_token(token_data['access_token'], scope_activity_read_all, scope_profile_read_all, expires_at, user.id)
@@ -179,10 +182,9 @@ def retrieve_gear():
     user = current_user
     access_token_code = retrieve_valid_access_code(user.id)
     headers = {'Authorization': f'Bearer {access_token_code}'}
-    resp = requests.get(f'{BASE_URL}/athlete', headers=headers)
-    resp = resp.json() 
-    print(resp)
-    shoes = resp.get('shoes', '')
+    athlete_details_response = requests.get(f'{BASE_URL}/athlete', headers=headers)
+    athlete_details_data = athlete_details_response.json() 
+    shoes = athlete_details_data.get('shoes', '')
     shoe_objects = []
     active_shoes = []
     for shoe in shoes: 
@@ -233,26 +235,28 @@ def logged_in_home():
 
 @app.route('/webhook', methods=['GET','POST'])
 def webhook():
-    """Handle Strava webhook."""
-    if request.method == 'GET':
-        print("hello :)")
+    """Handle Strava webhook.""" 
+    # handle webhook subscription validation request 
+    if request.method == 'GET': 
         hub_challenge = request.args.get('hub.challenge', '')
         hub_verify_token = request.args.get('hub.verify_token', '')
         if hub_verify_token == STRAVA_VERIFY_TOKEN:
-            print("we out here")
             return jsonify({'hub.challenge': hub_challenge})
         elif hub_verify_token:
-            print("we here actually")
             return 'Invalid verify token', 403
         else:
-            print("there's a problem")
             return 'Invalid request'
+    # handle event 
     elif request.method == 'POST':
+        # gather information required to process event 
         data = request.get_json()
-        print("we got a post request on our webhook")
         user = crud.get_user_by_strava_id(data['owner_id'])
-        process_new_activity.delay(data, user.id, user.email)
-        print(data)
+        access_token_code = retrieve_valid_access_code(user.id)
+
+        # process event asynchronously with celery task 
+        process_new_event.delay(data, user.email, access_token_code)
+
+        # acknowledge new event with status code 200 (required within 2 seconds)
         return jsonify({"status": "success"})
     else:
         return "Invalid request"
@@ -274,62 +278,66 @@ def retrieve_valid_access_code(user_id):
             'refresh_token': refresh_token.code,
         }
 
-        response = requests.post(TOKEN_URL, data=data)  # Make request for new access code
-        response = response.json()
+        token_response = requests.post(TOKEN_URL, data=data)  # Make request for new access code
+        token_data = token_response.json()
 
         # Process response to update codes and expiration time in database
-        expiration_offset = response['expires_in']
+        expiration_offset = token_data['expires_in']
         expires_at = datetime.now() + timedelta(seconds = expiration_offset)
         access_token = crud.get_access_token(user_id)
         access_token.expires_at = expires_at
-        access_token.code = response['access_token']
-        refresh_token.code = response['refresh_token']
+        access_token.code = token_data['access_token']
+        refresh_token.code = token_data['refresh_token']
         db.session.add_all([access_token,refresh_token])
         db.session.commit()
 
     return access_token.code
 
 @celery.task
-def process_new_activity(data, user_id, user_email):
-    """Process new Strava activity."""
-    with app.app_context():
-        print(f"HEY UR USER IS {user_id}")
-        activity_id = data['object_id']
-        print(f'hey! thanks for telling me to process activity {activity_id}')
-        access_token_code = retrieve_valid_access_code(user_id)
-        headers = {'Authorization': f'Bearer {access_token_code}'}
-        params = {'include_all_efforts': False}
-        resp = requests.get(f'{BASE_URL}/activities/{activity_id}', headers=headers, params=params)
-        respData = resp.json()
-        gearDeets = respData['gear']
-        print(f'hello? {gearDeets}')
-        if respData['gear']['primary'] == True: 
-            print("you used your primary gear! no email needed :)")
-        else:
-            print("this should fire an email to check your gear!")
-            send_email(user_email, data)
-        # else: 
-        #     print("can't process activity without access token!")
+def process_new_event(data, user_email, access_token_code):
+    """Process new event from Strava webhook."""
+    # ignore events that don't represent creation of a new activity 
+    if data['object_type'] != 'activity' or data['aspect_type'] != 'create':
+        return 
 
-def send_email(recipient_address, data):
+    # retrieve detailed information on newly created activity from activities API
+    activity_id = data['object_id']
+    headers = {'Authorization': f'Bearer {access_token_code}'}
+    params = {'include_all_efforts': False}
+    activity_details_response = requests.get(f'{BASE_URL}/activities/{activity_id}', headers=headers, params=params)
+
+    # parse gear and sport type 
+    activity_details_data = activity_details_response.json()
+    strava_gear_id = activity_details_data['gear_id']
+    sport_type = activity_details_data['sport_type']
+
+    # check if activity type is out of scope for gear checker (only activity types that can have a default shoe are in scope)
+    if sport_type not in SHOE_ACTIVITIES: 
+        return
+
+    # check if gear used is the default for the sport per user settings in app 
+    if crud.shoe_is_default_for_sport(strava_gear_id, sport_type): 
+        sport_type_user_friendly = USER_FRIENDLY_SPORT_NAMES[sport_type]
+        activity_date = datetime.fromisoformat(activity_details_data['start_date_local']).date
+        send_email(user_email, sport_type_user_friendly, activity_date)
+
+def send_email(recipient_address, sport_type, activity_date):
     """Send email notification."""
-    sport_type = data['sport_type']
-    activity_date = datetime.fromisoformat(data['start_date_local']).date
+    # build message
     msg = Message(f'Check your gear on your {sport_type} on {activity_date}', sender = 'stravagearupdater@gmail.com', recipients = [recipient_address])
     msg.body = f"Hello athlete!<br> \
-        You logged a {sport_type} on {activity_date} using your default gear, .<br> \
+        You logged a {sport_type} on {activity_date} using your default gear. <br> \
         If that's the gear you used, you can ignore this message! \
-        Otherwise, this is your reminder to update your gear. \
-        You can update your gear in Strava or use the buttons below."
-
+        Otherwise, this is your reminder to update your gear."
+    
+    #send message 
     mail.send(msg)
-    return "sent"
 
-@app.route('/update-activity-gear', methods=['PUT']) 
-@login_required
-def update_activity_gear():
-    """Update activity gear settings."""
-    request.form.get(activity)
+# @app.route('/update-activity-gear', methods=['PUT']) 
+# @login_required
+# def update_activity_gear():
+#     """Update activity gear settings."""
+#     request.form.get(activity)
 
 if __name__ == '__main__':
     connect_to_db(app)
