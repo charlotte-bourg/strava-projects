@@ -28,42 +28,9 @@ class User(UserMixin, db.Model):
     access_tokens = db.relationship("AccessToken", back_populates="user")
     refresh_tokens = db.relationship("RefreshToken", back_populates="user")
     shoes = db.relationship("Shoe", back_populates="user")
-    default_shoes = db.relationship("DefaultShoe", back_populates="user")
 
     def __repr__(self):
         return f'<User id={self.id} email={self.email}>'
-
-class ActivityType(db.Model):
-    """Model for activity types."""
-    
-    __tablename__ = "activity_types"
-    
-    id = db.Column(db.Integer, autoincrement=True, primary_key=True)
-    name = db.Column(db.String, unique=True)
-    
-    def __repr__(self):
-        return f'<ActivityType id={self.id} name={self.name}>'
-
-class DefaultShoe(db.Model):
-    """Association table for default shoes and activity types."""
-    
-    __tablename__ = "default_shoes"
-    
-    id = db.Column(db.Integer, autoincrement=True, primary_key=True)
-    shoe_id = db.Column(db.Integer, db.ForeignKey("shoes.id"))
-    activity_type_id = db.Column(db.Integer, db.ForeignKey("activity_types.id"))
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
-
-    shoe = db.relationship("Shoe", backref="default_shoes")
-    activity_type = db.relationship("ActivityType", backref="default_shoes")
-    user = db.relationship("User", back_populates="default_shoes")
-    
-    __table_args__ = (db.UniqueConstraint('shoe_id', 'activity_type_id'),)
-
-    def __repr__(self):
-        return f'<DefaultShoe id={self.id}>'
-
-
 class Shoe(db.Model):
     """A shoe from Strava gear."""
 
@@ -74,6 +41,7 @@ class Shoe(db.Model):
     name = db.Column(db.String)
     nickname = db.Column(db.String)
     retired = db.Column(db.Boolean)
+    run_default = db.Column(db.Boolean)
 
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
 

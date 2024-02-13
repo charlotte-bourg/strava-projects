@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block body %}
+
+<h1>Set your default shoes for running</h1>
+
+<form action="/set-default-run-gear" method="POST">
+    <label for="dropdown">Select an Option:</label>
+    <select id="dropdown" name="dropdown">
+        {% for shoe in shoes %}
+            <option value={{ shoe.id }}>{{ shoe.name }}{% if shoe.nickname %}&nbsp;({{ shoe.nickname }}){% endif %}</option>
+        {% endfor %}
+    </select>
+    <br>
+    <input type="submit" value="Submit">
+</form>
+
+{% endblock %}

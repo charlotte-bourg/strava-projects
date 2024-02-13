@@ -193,9 +193,10 @@ def webhook():
         data = request.get_json()
         user = crud.get_user_by_strava_id(data['owner_id'])
         access_token_code = retrieve_valid_access_code(user.id)
+        user_default_shoe_strava_id = crud.get_user_default_shoe(user.id).strava_gear_id
 
         # process event asynchronously with celery task 
-        process_new_event.delay(data, user.email, access_token_code)
+        process_new_event.delay(data, user.email, user_default_shoe_strava_id, access_token_code)
 
         # acknowledge new event with status code 200 (required within 2 seconds)
         return jsonify({"status": "success"})
@@ -209,7 +210,6 @@ def retrieve_valid_access_code(user_id):
         print("using existing access token")
         return crud.get_access_token(user_id).code 
     
-
     # use refresh token to retrieve new access token 
     token_data = refresh_tokens(user_id)
     print(token_data)
@@ -251,7 +251,6 @@ def update_tokens_in_db(user_id, token_data):
 
     return access_token_code
 
-
 # display and update gear defaults routes
 @app.route('/update-gear')
 def updateGear():
@@ -264,76 +263,43 @@ def retrieve_gear():
     """Retrieve gear data from Strava."""
     user = current_user
     access_token_code = retrieve_valid_access_code(user.id)
+
+    # retrieve user's shoes from strava
     headers = {'Authorization': f'Bearer {access_token_code}'}
     athlete_details_response = requests.get(f'{BASE_URL}/athlete', headers=headers)
     athlete_details_data = athlete_details_response.json() 
-    print(athlete_details_data)
     shoes = athlete_details_data.get('shoes', '')
+
     shoe_objects = []
     active_shoes = []
     for shoe in shoes: 
-        print(shoe)
+        # if the shoe is in the app database, ensure all data is up to date 
         if crud.get_shoe_by_strava_id(shoe['id']):
             shoe_obj = crud.get_shoe_by_strava_id(shoe['id'])
             if shoe_obj.name != shoe['name']:
                 shoe_obj.name = shoe['name']
             if shoe_obj.retired != shoe['retired']:
                 shoe_obj.retired = shoe['retired']
-                # if a shoe is retired, it won't be returned with athlete, handle that
-                print('HEY theres a discrepancy in shoe retirement')
             if shoe_obj.nickname != shoe['nickname']:
                 shoe_obj.nickname = shoe['nickname']
+        # if shoe isn't yet in app database, add it
         else: 
             shoe_obj = crud.create_shoe(shoe['id'], shoe['name'], shoe['nickname'], shoe['retired'], user.id)
             shoe_objects.append(shoe_obj)
+        # only display active shoes on the front end 
         if not shoe_obj.retired:
             active_shoes.append(shoe_obj)
     db.session.add_all(shoe_objects)
     db.session.commit()
-    print(active_shoes)
-    return render_template('gear_setup.html', shoes = active_shoes)
-
-@app.route('/set-default-gear', methods=['POST'])
-@login_required
-def update_default_gear():
-    """Update default gear settings."""
-    user = current_user
     
-    shoe_id = request.json['shoe_id']
-    activity_types = request.json['activity_types']
+    return render_template('set_default_gear.html', shoes = active_shoes)
 
-    print(f"HELLO should update defaults for {shoe_id} for {activity_types}")
-    
-    added_associations = {}
-    deleted_associations = {}
-    user_previous_defaults = crud.get_defaults_for_user(user.id)
-    for default in user_previous_defaults:
-        assoc_activity_name = default.activity_type.name
-        assoc_shoe_id = default.shoe_id
-        if (assoc_activity_name in activity_types and assoc_shoe_id != shoe_id) or (assoc_shoe_id == shoe_id and assoc_activity_name not in activity_types):
-            db.session.delete(default)
-            db.session.commit() 
-            deleted_associations[shoe_id] = assoc_activity_name 
-        else: 
-            activity_types.remove(assoc_activity_name)
+@app.route('/set-default-run-gear', methods=['POST'])
 
-    new_default_associations = []
-    for activity_type in activity_types: 
-        print(f"the activity type is {activity_type}")
-        assoc = crud.create_default_association(shoe_id, activity_type, user.id)
-        new_default_associations.append(assoc)
-        added_associations[shoe_id] = activity_type
-    db.session.add_all(new_default_associations)
-    db.session.commit()
-
-    return {
-        "success": True,
-        "addedAssociations": added_associations,
-        "deletedAssociations": deleted_associations}
 
 # process new activity routes 
 @celery.task
-def process_new_event(data, user_email, access_token_code):
+def process_new_event(data, user_email, user_default_shoe_strava_id, access_token_code):
     """Process new event from Strava webhook."""
     # ignore events that don't represent creation of a new activity 
     if data['object_type'] != 'activity' or data['aspect_type'] != 'create':
@@ -355,7 +321,7 @@ def process_new_event(data, user_email, access_token_code):
         return
 
     # check if gear used is the default for the sport per user settings in app 
-    if crud.shoe_is_default_for_sport(strava_gear_id, sport_type): 
+    if strava_gear_id == user_default_shoe_strava_id:
         sport_type_user_friendly = USER_FRIENDLY_SPORT_NAMES[sport_type]
         activity_date = datetime.fromisoformat(activity_details_data['start_date_local']).date
         send_email(user_email, sport_type_user_friendly, activity_date)

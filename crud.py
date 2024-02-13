@@ -1,6 +1,6 @@
 """CRUD operations for interacting with the database."""
 
-from model import db, User, AccessToken, RefreshToken, Shoe, ActivityType, DefaultShoe, connect_to_db
+from model import db, User, AccessToken, RefreshToken, Shoe, connect_to_db
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 
@@ -14,40 +14,24 @@ def get_user_by_email(email):
 
 def create_shoe(strava_id, name, nickname, retired, user_id):
     """Create a shoe instance."""
-    shoe = Shoe(strava_gear_id=strava_id, name=name, nickname=nickname, retired=retired, user_id=user_id)
+    shoe = Shoe(strava_gear_id=strava_id, name=name, nickname=nickname, retired=retired, user_id=user_id, run_default=False)
     return shoe
+
+def get_shoe_by_id(id):
+    """Retrieve a shoe by internal ID."""
+    return Shoe.query.get(id)
 
 def get_shoe_by_strava_id(strava_id):
     """Retrieve a shoe by Strava ID."""
     return Shoe.query.filter_by(strava_gear_id=strava_id).first()
 
-def create_default_association(shoe_id, activity_name, user_id):
-    """Create a default association between a shoe and an activity type."""
-    activity_type_id = ActivityType.query.filter_by(name = activity_name).first().id
-    default_shoe = DefaultShoe(shoe_id = shoe_id, activity_type_id = activity_type_id, user_id = user_id)
-    return default_shoe
-
-def get_defaults_for_user(user_id):
-    """Get any default associations for the user."""
-    return DefaultShoe.query.filter_by(user_id = user_id).all()
-
-# TODO
-def user_has_default_for_activity():
-    """Check if a user has a default activity."""
-    pass
-
-# TODO
-def get_user_default_for_activity():
-    """Retrieve the default activity for a user."""
-    pass
+def get_user_default_shoe(user_id):
+    """Retrieve a user's default shoe."""
+    return Shoe.query.filter_by(user_id = user_id, run_default = True).first() 
 
 def get_user_by_strava_id(strava_id):
     """Retrieve a user by Strava ID."""
     return User.query.filter_by(strava_id=strava_id).first()
-
-def get_activity_type_by_name(name):
-    """Retrieve an activity type by name."""
-    return ActivityType.query.filter_by(name=name).first()
 
 def create_user(email, password):
     """Create a new user."""

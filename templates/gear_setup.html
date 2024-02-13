@@ -46,8 +46,10 @@
     </tr>
     {% for shoe in shoes %}
     <tr> 
-        <td>
-
+        <td name="defaults" id={{ shoe.id }}>
+        {% if shoe.id in defaults %}
+          {{ defaults[shoe.id] }}
+        {% endif %}
         </td>
 
         <td> 
