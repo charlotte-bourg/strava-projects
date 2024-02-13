@@ -291,11 +291,25 @@ def retrieve_gear():
             active_shoes.append(shoe_obj)
     db.session.add_all(shoe_objects)
     db.session.commit()
-    
+
     return render_template('set_default_gear.html', shoes = active_shoes)
 
 @app.route('/set-default-run-gear', methods=['POST'])
-
+@login_required
+def set_default_run_shoes():
+    """Update the default running shoes for a user. """
+    user = current_user
+    previous_default_shoe = crud.get_user_default_shoe(user.id)
+    new_default_shoe_id = int(request.form['dropdown'])
+    if previous_default_shoe and previous_default_shoe.id == new_default_shoe_id:
+        return "that was already your default"
+    else:
+        if previous_default_shoe:
+            previous_default_shoe.run_default = False
+        shoe_obj = crud.get_shoe_by_id(new_default_shoe_id)
+        shoe_obj.run_default = True
+        db.session.commit()
+    return "you're all set up!"
 
 # process new activity routes 
 @celery.task
@@ -323,14 +337,15 @@ def process_new_event(data, user_email, user_default_shoe_strava_id, access_toke
     # check if gear used is the default for the sport per user settings in app 
     if strava_gear_id == user_default_shoe_strava_id:
         sport_type_user_friendly = USER_FRIENDLY_SPORT_NAMES[sport_type]
-        activity_date = datetime.fromisoformat(activity_details_data['start_date_local']).date
-        send_email(user_email, sport_type_user_friendly, activity_date)
+        activity_date = datetime.strptime(activity_details_data['start_date_local'], '%Y-%m-%dT%H:%M:%SZ')
+        activity_date_friendly = activity_date.strftime('%m/%d')
+        send_email(user_email, sport_type_user_friendly, activity_date_friendly)
 
 def send_email(recipient_address, sport_type, activity_date):
     """Send email notification."""
     # build message
     msg = Message(f'Check your gear on your {sport_type} on {activity_date}', sender = 'stravagearupdater@gmail.com', recipients = [recipient_address])
-    msg.body = f"Hello athlete!<br> \
+    msg.html = f"Hello athlete!<br> \
         You logged a {sport_type} on {activity_date} using your default gear. <br> \
         If that's the gear you used, you can ignore this message! \
         Otherwise, this is your reminder to update your gear."
