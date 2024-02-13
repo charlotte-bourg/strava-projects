@@ -14,4 +14,10 @@
     <input type="submit" value="Submit">
 </form>
 
+{% if default_shoe %}
+Your current default shoe is: {{ default_shoe.name }}
+{% else %}
+You don't have a current default shoe set. 
+{% endif %}
+
 {% endblock %}

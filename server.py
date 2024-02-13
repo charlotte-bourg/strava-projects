@@ -193,10 +193,13 @@ def webhook():
         data = request.get_json()
         user = crud.get_user_by_strava_id(data['owner_id'])
         access_token_code = retrieve_valid_access_code(user.id)
-        user_default_shoe_strava_id = crud.get_user_default_shoe(user.id).strava_gear_id
+        user_default_shoe = crud.get_user_default_shoe(user.id)
+        user_default_shoe_strava_id = user_default_shoe.strava_gear_id
+        user_default_shoe_name = user_default_shoe.name
+        
 
         # process event asynchronously with celery task 
-        process_new_event.delay(data, user.email, user_default_shoe_strava_id, access_token_code)
+        process_new_event.delay(data, user.email, user_default_shoe_strava_id, user_default_shoe_name, access_token_code)
 
         # acknowledge new event with status code 200 (required within 2 seconds)
         return jsonify({"status": "success"})
@@ -291,8 +294,8 @@ def retrieve_gear():
             active_shoes.append(shoe_obj)
     db.session.add_all(shoe_objects)
     db.session.commit()
-
-    return render_template('set_default_gear.html', shoes = active_shoes)
+    default_shoe = crud.get_user_default_shoe(user.id)
+    return render_template('set_default_gear.html', default_shoe = default_shoe, shoes = active_shoes)
 
 @app.route('/set-default-run-gear', methods=['POST'])
 @login_required
@@ -302,18 +305,18 @@ def set_default_run_shoes():
     previous_default_shoe = crud.get_user_default_shoe(user.id)
     new_default_shoe_id = int(request.form['dropdown'])
     if previous_default_shoe and previous_default_shoe.id == new_default_shoe_id:
-        return "that was already your default"
+        return redirect('/retrieve-gear')
     else:
         if previous_default_shoe:
             previous_default_shoe.run_default = False
         shoe_obj = crud.get_shoe_by_id(new_default_shoe_id)
         shoe_obj.run_default = True
         db.session.commit()
-    return "you're all set up!"
+    return redirect('/retrieve-gear')
 
 # process new activity routes 
 @celery.task
-def process_new_event(data, user_email, user_default_shoe_strava_id, access_token_code):
+def process_new_event(data, user_email, user_default_shoe_strava_id, user_default_shoe_name, access_token_code):
     """Process new event from Strava webhook."""
     # ignore events that don't represent creation of a new activity 
     if data['object_type'] != 'activity' or data['aspect_type'] != 'create':
@@ -339,16 +342,16 @@ def process_new_event(data, user_email, user_default_shoe_strava_id, access_toke
         sport_type_user_friendly = USER_FRIENDLY_SPORT_NAMES[sport_type]
         activity_date = datetime.strptime(activity_details_data['start_date_local'], '%Y-%m-%dT%H:%M:%SZ')
         activity_date_friendly = activity_date.strftime('%m/%d')
-        send_email(user_email, sport_type_user_friendly, activity_date_friendly)
+        send_email(user_email, sport_type_user_friendly, user_default_shoe_name, activity_date_friendly)
 
-def send_email(recipient_address, sport_type, activity_date):
+def send_email(recipient_address, sport_type, user_default_shoe_name, activity_date):
     """Send email notification."""
     # build message
     msg = Message(f'Check your gear on your {sport_type} on {activity_date}', sender = 'stravagearupdater@gmail.com', recipients = [recipient_address])
     msg.html = f"Hello athlete!<br> \
-        You logged a {sport_type} on {activity_date} using your default gear. <br> \
+        You logged a {sport_type} on {activity_date} using your default gear ({user_default_shoe_name}). <br> \
         If that's the gear you used, you can ignore this message! \
-        Otherwise, this is your reminder to update your gear."
+        Otherwise, this is your reminder to update your gear."  
     
     mail.send(msg)
 
