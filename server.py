@@ -352,7 +352,7 @@ def send_email(recipient_address, sport_type, user_default_shoe_name, activity_d
         You logged a {sport_type} on {activity_date} using your default gear ({user_default_shoe_name}). <br> \
         If that's the gear you used, you can ignore this message! \
         Otherwise, this is your reminder to update your gear."  
-    
+    print(msg.recipients)
     mail.send(msg)
 
 if __name__ == '__main__':
