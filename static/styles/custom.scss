@@ -1,0 +1,12 @@
+// required to get $orange variable
+@import "//static/bootstrap/scss/bootstrap.scss";
+
+$primary: #FC4C02; // set the $primary variable
+
+// merge with existing $theme-colors map
+// $theme-colors: map-merge($theme-colors, (
+//   "primary": $primary
+// ));
+
+// set changes
+@import "//static/bootstrap/scss/bootstrap.scss";

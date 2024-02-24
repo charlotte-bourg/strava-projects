@@ -2,7 +2,7 @@
 
 import os
 import requests
-from flask import Flask, flash, render_template, request, redirect, session, jsonify
+from flask import Flask, flash, render_template, request, redirect, jsonify
 from flask_mail import Mail, Message
 from celery import Celery, Task
 import logging
@@ -76,17 +76,19 @@ def load_user(user_id):
 @app.route('/')
 def login_entry():
     """Display login page."""
-    return render_template('login.html')
+    return render_template('log-in.html')
 
-@app.route('/login', methods=['POST'])
+@app.route('/log-in', methods=['POST'])
 def login():
     """Handle user login."""
-    email = request.form['email']
-    password = request.form['password']
+    email = request.form.get('email', '')
+    password = request.form.get('password', '')
+    if not email or not password: 
+        return redirect('/')
     remember = True if request.form.get('remember') else False
     user = crud.get_user_by_email(email) 
     if not user:
-        flash("There's no account associated with that email!")
+        flash("There's no account associated with that email! You may sign up for a new account below")
         return redirect('/sign-up')
     if user and crud.check_password(user, password):
         login_user(user, remember=remember)
@@ -97,7 +99,7 @@ def login():
     else: 
         flash("Incorrect username/password combination")
 
-@app.route('/logout')
+@app.route('/log-out')
 @login_required
 def logout():
     """Handle user logout."""
@@ -110,15 +112,9 @@ def display_sign_up():
     """Display sign-up page."""
     return render_template('sign-up.html')
 
-@app.route('/home')
-@login_required
-def logged_in_home(): 
-    """Display home page for logged-in user."""
-    return render_template('home.html')
-
-@app.route('/register', methods=['POST'])
-def register():
-    """Handle user registration."""
+@app.route('/sign-up', methods=['POST'])
+def sign_up():
+    """Handle user account creation."""
     email = request.form['email']
     if crud.get_user_by_email(email):
         flash("There's already an account associated with that email!")
@@ -128,6 +124,12 @@ def register():
     db.session.add(new_user)
     db.session.commit()
     return redirect('/')
+
+@app.route('/home')
+@login_required
+def logged_in_home(): 
+    """Display home page for logged-in user."""
+    return render_template('home.html')
 
 # strava authentication routes
 @app.route('/strava-auth')
