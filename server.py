@@ -69,7 +69,11 @@ app.config['MAIL_USE_SSL'] = True
 mail = Mail(app)
 
 SHOE_ACTIVITIES = {'Run', 'VirtualRun', 'TrailRun', 'Hike', 'Walk'}
+THIRD_PARTY_ACTIVITIES = {'EBikeRide', 'Ride', 'Run', 'Swim', 'VirtualRide', 'VirtualRun'}
+# All activities reference: AlpineSki, BackcountrySki, Canoeing, Crossfit, EBikeRide, Elliptical, Golf, Handcycle, Hike, IceSkate, InlineSkate, Kayaking, Kitesurf, NordicSki, Ride, RockClimbing, RollerSki, Rowing, Run, Sail, Skateboard, Snowboard, Snowshoe, Soccer, StairStepper, StandUpPaddling, Surfing, Swim, Velomobile, VirtualRide, VirtualRun, Walk, WeightTraining, Wheelchair, Windsurf, Workout, Yoga
+# TODO consider capitalization for use cases
 USER_FRIENDLY_SPORT_NAMES = {'Run': 'run', 'VirtualRun': 'virtual run', 'TrailRun': 'trail run', 'Hike': 'hike', 'Walk': 'walk'}
+#USER_FRIENDLY_SPORT_NAMES = {'Run': 'run', 'VirtualRun': 'virtual run', 'TrailRun': 'trail run', 'Hike': 'hike', 'Walk': 'walk', 'EBikeRide': 'E Bike Ride'}
 
 # user handling routes 
 @login_manager.user_loader
@@ -373,17 +377,21 @@ def files_display():
     activities_response = requests.get(f'{BASE_URL}/athlete/activities', headers=headers, params=params)
     activities_data = activities_response.json()
     print(activities_data)
-    run_activities = []
+    export_activities = []
     for activity_data in activities_data: 
-        if activity_data["type"] == "Run":
-            print(f"found a run with id {activity_data['id']}")
-            run_activity_dict = {}
-            run_activity_dict["id"] = activity_data["id"]
-            run_activity_dict["name"] = activity_data["name"]
-            run_activity_dict["date"] = activity_data["start_date_local"]
-            run_activity_dict["type"] = activity_data["type"]
-            run_activities.append(run_activity_dict)
-    return render_template('testing.html', runs=run_activities)
+        if activity_data.get('type', '') in THIRD_PARTY_ACTIVITIES: 
+            print(f"found an activity with id {activity_data['id']}")
+            activity = {}
+            activity["id"] = activity_data.get('id','')
+            activity["name"] = activity_data.get('name','')
+            date = activity_data.get('start_date_local','')
+            activity_date = datetime.strptime(date, '%Y-%m-%dT%H:%M:%SZ')
+            activity_datetime_friendly = activity_date.strftime('%m/%d at %I:%M %p')
+            activity["date"] = activity_datetime_friendly
+            activity["weekday"] = activity_date.strftime('%A')
+            activity["type"] = activity_data.get('type','')
+            export_activities.append(activity)
+    return render_template('testing.html', activities=export_activities)
 
 
     
