@@ -2,11 +2,11 @@
 
 import os
 import requests
-from flask import Flask, flash, render_template, request, redirect, jsonify
+from flask import Flask, flash, render_template, request, redirect, jsonify, session
 from flask_mail import Mail, Message
 from celery import Celery, Task
 import logging
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+# from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import crud
 from model import db, connect_to_db
 from datetime import datetime, timedelta
@@ -19,11 +19,12 @@ app = Flask(__name__)
 app.secret_key = os.environ['FLASK_KEY']
 
 # Flask-Login setup
-login_manager = LoginManager()
-login_manager.init_app(app)
+# login_manager = LoginManager()
+# login_manager.init_app(app)
+
 
 # Celery setup
-def celery_init_app(app: Flask) -> Celery:
+def celery_init_app(app: Flask) -> Celery: 
     class FlaskTask(Task):
         def __call__(self, *args: object, **kwargs: object) -> object:
             with app.app_context():
@@ -57,7 +58,7 @@ TOKEN_URL = 'https://www.strava.com/api/v3/oauth/token'
 DEAUTHORIZE_URL = 'https://www.strava.com/oauth/deauthorize'
 
 # Permission scopes for Strava authentication
-SCOPES = 'activity:read_all,profile:read_all'
+SCOPES = 'read,activity:read_all,profile:read_all'
 
 # Flask-Mail configuration
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -76,45 +77,24 @@ USER_FRIENDLY_SPORT_NAMES = {'Run': 'run', 'VirtualRun': 'virtual run', 'TrailRu
 #USER_FRIENDLY_SPORT_NAMES = {'Run': 'run', 'VirtualRun': 'virtual run', 'TrailRun': 'trail run', 'Hike': 'hike', 'Walk': 'walk', 'EBikeRide': 'E Bike Ride'}
 
 # user handling routes 
-@login_manager.user_loader
-def load_user(user_id):
-    """Load user for Flask-Login."""
-    return crud.get_user_by_id(user_id)
+# @login_manager.user_loader
+# def load_user(user_id):
+#     """Load user for Flask-Login."""
+#     return crud.get_user_by_id(user_id)
 
 @app.route('/')
 def login_entry():
     """Display login page."""
-    return render_template('log-in.html')
+    return render_template('strava-sso-home.html')
 
-@app.route('/log-in', methods=['POST'])
-def login():
-    """Handle user login."""
-    email = request.form.get('email', '')
-    password = request.form.get('password', '')
-    if not email or not password: 
-        return redirect('/')
-    remember = True if request.form.get('remember') else False
-    user = crud.get_user_by_email(email) 
-    if not user:
-        flash("There's no account associated with that email! You may sign up for a new account below")
-        return redirect('/sign-up')
-    if user and crud.check_password(user, password):
-        login_user(user, remember=remember)
-        flash("Logged in!")
-        # if crud.strava_authenticated(user.id):
-        #     return redirect('/home')
-        # # return redirect('/strava-auth')
-        # return render_template('strava-auth.')
-        return redirect('/home')
-    else: 
-        flash("Incorrect username/password combination")
 
 @app.route('/log-out')
-@login_required
+# @login_required
 def logout():
     """Handle user logout."""
-    logout_user()
-    flash("Logged out!")
+    # TODO 
+    # logout_user()
+    # flash("Logged out!")
     return redirect('/')
 
 @app.route('/sign-up')
@@ -136,7 +116,7 @@ def sign_up():
     return redirect('/')
 
 @app.route('/home')
-@login_required
+# # @login_required
 def logged_in_home(): 
     """Display home page for logged-in user."""
     user = current_user
@@ -155,7 +135,7 @@ def authenticate():
     return redirect(f'{AUTHORIZE_URL}?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={SCOPES}')
 
 @app.route('/callback')
-@login_required
+# # # @login_required
 def callback():
     """Handle callback from Strava after authentication."""
     user = current_user 
@@ -280,7 +260,7 @@ def updateGear():
     return render_template('update-gear.html')
 
 @app.route('/retrieve-gear')
-@login_required
+# # @login_required
 def retrieve_gear():
     """Retrieve gear data from Strava."""
     user = current_user
@@ -317,7 +297,7 @@ def retrieve_gear():
     return render_template('set-default-gear.html', default_shoe = default_shoe, shoes = active_shoes)
 
 @app.route('/set-default-run-gear', methods=['POST'])
-@login_required
+# # @login_required
 def set_default_run_shoes():
     """Update the default running shoes for a user. """
     user = current_user
@@ -365,7 +345,7 @@ def files():
     return("ok")
 
 @app.route('/files')
-@login_required
+# # @login_required
 def files_display():
     user = current_user
     access_token_code = retrieve_valid_access_code(user.id)
