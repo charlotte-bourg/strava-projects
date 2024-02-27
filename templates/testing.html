@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+Please check that you're logged into Strava!<br>
+<a class="btn btn-primary" href="https://www.strava.com/login" target="_blank">Check strava</a><br>
+
+{% for run in runs %}
+    <a href="https://www.strava.com/activities/{{run.id}}/export_original"> {{ run.name }} at {{ run.date }}</a><br> 
+{% endfor %}
+
+{% endblock %}

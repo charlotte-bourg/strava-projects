@@ -10,6 +10,10 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 import crud
 from model import db, connect_to_db
 from datetime import datetime, timedelta
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+import time
+import json
 
 app = Flask(__name__)
 app.secret_key = os.environ['FLASK_KEY']
@@ -324,6 +328,66 @@ def set_default_run_shoes():
         shoe_obj.run_default = True
         db.session.commit()
     return redirect('/retrieve-gear')
+
+@app.route('/opt-into-email')
+
+
+########
+@app.route('/test-file-download')
+def pull_file_from_given_url():
+    activity_id = 10844712739
+    user = current_user
+    access_token = retrieve_valid_access_code(user.id)
+
+    inst = datetime.now()
+    download_url = f"https://www.strava.com/activities/{activity_id}/export_original"
+    response = requests.get(download_url)
+
+    if response.status_code == 200:
+        with open(f'activity_{activity_id}_{inst}.fit', 'wb') as f:
+            f.write(response.content)
+        print(f"Downloaded .fit file for activity {activity_id}")
+    else:
+        print(f"Failed to download .fit file for activity {activity_id}")
+    return 
+
+@app.route('/test-list')
+def files():
+    options = webdriver.ChromeOptions()
+    prefs = {"download.default_directory" : r'C:\Users\charl\Downloads\strava_files\\' }
+    options.add_experimental_option("prefs",prefs)
+    driver = webdriver.Chrome(options=options)
+    # driver.get('https://www.strava.com/activities/10823760775/export_original')
+    return("ok")
+
+@app.route('/files')
+@login_required
+def files_display():
+    user = current_user
+    access_token_code = retrieve_valid_access_code(user.id)
+
+    # retrieve user's last up to 200 activities from strava in the last week
+    headers = {'Authorization': f'Bearer {access_token_code}'}
+    week_ago = int(time.time()) - 604800
+    params = {'after': week_ago}
+    activities_response = requests.get(f'{BASE_URL}/athlete/activities', headers=headers, params=params)
+    activities_data = activities_response.json()
+    print(activities_data)
+    run_activities = []
+    for activity_data in activities_data: 
+        if activity_data["type"] == "Run":
+            print(f"found a run with id {activity_data['id']}")
+            run_activity_dict = {}
+            run_activity_dict["id"] = activity_data["id"]
+            run_activity_dict["name"] = activity_data["name"]
+            run_activity_dict["date"] = activity_data["start_date_local"]
+            run_activity_dict["type"] = activity_data["type"]
+            run_activities.append(run_activity_dict)
+    return render_template('testing.html', runs=run_activities)
+
+
+    
+########
 
 # process new activity routes 
 @celery.task
