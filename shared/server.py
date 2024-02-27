@@ -2,7 +2,7 @@
 
 import os
 import requests
-from flask import Flask, flash, render_template, request, redirect, jsonify, session
+from flask import Flask, flash, render_template, request, redirect, jsonify, blueprint
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_mail import Mail, Message
 from celery import Celery, Task
@@ -10,8 +10,6 @@ import logging
 import crud
 from model import db, connect_to_db
 from datetime import datetime, timedelta
-from selenium import webdriver
-from webdriver_manager.chrome import ChromeDriverManager
 import time
 
 app = Flask(__name__)
