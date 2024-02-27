@@ -93,10 +93,11 @@ def login():
     if user and crud.check_password(user, password):
         login_user(user, remember=remember)
         flash("Logged in!")
-        if crud.strava_authenticated(user.id):
-            return redirect('/home')
-        # return redirect('/strava-auth')
-        return render_template('strava-auth.')
+        # if crud.strava_authenticated(user.id):
+        #     return redirect('/home')
+        # # return redirect('/strava-auth')
+        # return render_template('strava-auth.')
+        return redirect('/home')
     else: 
         flash("Incorrect username/password combination")
 
@@ -130,7 +131,14 @@ def sign_up():
 @login_required
 def logged_in_home(): 
     """Display home page for logged-in user."""
-    return render_template('home.html')
+    user = current_user
+    strava_auth = crud.strava_authenticated(user.id)
+    if crud.get_user_default_shoe(user.id):
+        gear_default = True
+    else: 
+        gear_default = False 
+    email_consent = user.email_consent 
+    return render_template('home.html', strava_auth=strava_auth, gear_default=gear_default, email_consent=email_consent)
 
 # strava authentication routes
 @app.route('/strava-auth')
@@ -298,7 +306,7 @@ def retrieve_gear():
     db.session.add_all(shoe_objects)
     db.session.commit()
     default_shoe = crud.get_user_default_shoe(user.id)
-    return render_template('set_default_gear.html', default_shoe = default_shoe, shoes = active_shoes)
+    return render_template('set-default-gear.html', default_shoe = default_shoe, shoes = active_shoes)
 
 @app.route('/set-default-run-gear', methods=['POST'])
 @login_required

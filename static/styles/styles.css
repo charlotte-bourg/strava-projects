@@ -24,7 +24,7 @@ body {
   border-top-right-radius: 0;
 }
 
-.outline-box{
+.narrow-outline-box{
   max-width: 500px; 
   background-color: #D7D3D9;
   text-align: center; 
@@ -32,3 +32,13 @@ body {
   height: 100VH;
 }
 
+.wide-outline-box{
+  max-width: 1000px; 
+  background-color: #D7D3D9; 
+  margin: auto; 
+  height: 100VH;
+}
+
+.no-ul{
+  text-decoration: none; 
+}
