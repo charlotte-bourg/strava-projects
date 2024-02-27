@@ -26,8 +26,9 @@ body {
 
 .outline-box{
   max-width: 500px; 
-  background-color: #cfc7d2;
+  background-color: #D7D3D9;
   text-align: center; 
   margin: auto; 
+  height: 100VH;
 }
 

@@ -95,7 +95,8 @@ def login():
         flash("Logged in!")
         if crud.strava_authenticated(user.id):
             return redirect('/home')
-        return redirect('/strava-auth')
+        # return redirect('/strava-auth')
+        return render_template('strava-auth.')
     else: 
         flash("Incorrect username/password combination")
 

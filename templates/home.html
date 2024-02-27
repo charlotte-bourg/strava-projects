@@ -1,12 +1,17 @@
 {% extends 'base.html' %}
 {% block body %}
 
-Welcome!
 
-Now it's time to set up your default gear!
+
 
 <form action="/retrieve-gear">
     <button type="submit" class="btn btn-primary">Retrieve my gear</button>
 </form>
+
+<!-- status/task list for:
+- strava auth / deauth 
+- gear setup
+- opt into emails  
+- pass in booleans for which of those tasks have been done then update them appropriately -->
 
 {% endblock %}
