@@ -3,25 +3,23 @@
 import os
 import requests
 from flask import Flask, flash, render_template, request, redirect, jsonify, session
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_mail import Mail, Message
 from celery import Celery, Task
 import logging
-# from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import crud
 from model import db, connect_to_db
 from datetime import datetime, timedelta
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 import time
-import json
 
 app = Flask(__name__)
 app.secret_key = os.environ['FLASK_KEY']
 
 # Flask-Login setup
-# login_manager = LoginManager()
-# login_manager.init_app(app)
-
+login_manager = LoginManager()
+login_manager.init_app(app)
 
 # Celery setup
 def celery_init_app(app: Flask) -> Celery: 
@@ -77,56 +75,36 @@ USER_FRIENDLY_SPORT_NAMES = {'Run': 'run', 'VirtualRun': 'virtual run', 'TrailRu
 #USER_FRIENDLY_SPORT_NAMES = {'Run': 'run', 'VirtualRun': 'virtual run', 'TrailRun': 'trail run', 'Hike': 'hike', 'Walk': 'walk', 'EBikeRide': 'E Bike Ride'}
 
 # user handling routes 
-# @login_manager.user_loader
-# def load_user(user_id):
-#     """Load user for Flask-Login."""
-#     return crud.get_user_by_id(user_id)
+@login_manager.user_loader
+def load_user(user_id):
+    """Load user for Flask-Login."""
+    return crud.get_user_by_id(user_id)
 
 @app.route('/')
 def login_entry():
     """Display login page."""
-    return render_template('strava-sso-home.html')
-
+    return render_template('log-in.html')
 
 @app.route('/log-out')
-# @login_required
 def logout():
     """Handle user logout."""
-    # TODO 
-    # logout_user()
-    # flash("Logged out!")
-    return redirect('/')
-
-@app.route('/sign-up')
-def display_sign_up():
-    """Display sign-up page."""
-    return render_template('sign-up.html')
-
-@app.route('/sign-up', methods=['POST'])
-def sign_up():
-    """Handle user account creation."""
-    email = request.form['email']
-    if crud.get_user_by_email(email):
-        flash("There's already an account associated with that email!")
-        return redirect('/')
-    password = request.form['password']
-    new_user = crud.create_user(email, password)
-    db.session.add(new_user)
-    db.session.commit()
+    logout_user()
+    flash("Logged out!")
     return redirect('/')
 
 @app.route('/home')
-# # @login_required
+@login_required
 def logged_in_home(): 
     """Display home page for logged-in user."""
-    user = current_user
-    strava_auth = crud.strava_authenticated(user.id)
-    if crud.get_user_default_shoe(user.id):
-        gear_default = True
-    else: 
-        gear_default = False 
-    email_consent = user.email_consent 
-    return render_template('home.html', strava_auth=strava_auth, gear_default=gear_default, email_consent=email_consent)
+    return render_template('home.html')
+    # user = current_user
+    # strava_auth = crud.strava_authenticated(user.id)
+    # if crud.get_user_default_shoe(user.id):
+    #     gear_default = True
+    # else: 
+    #     gear_default = False 
+    # email_consent = user.email_consent 
+    # return render_template('home.html', strava_auth=strava_auth, gear_default=gear_default, email_consent=email_consent)
 
 # strava authentication routes
 @app.route('/strava-auth')
@@ -135,10 +113,8 @@ def authenticate():
     return redirect(f'{AUTHORIZE_URL}?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={SCOPES}')
 
 @app.route('/callback')
-# # # @login_required
 def callback():
     """Handle callback from Strava after authentication."""
-    user = current_user 
     err = request.args.get('error', '')
     if err: 
         flash("Can't set up gear updater without your Strava authentication")
@@ -162,13 +138,23 @@ def callback():
 
     if token_response.status_code == 200:
         token_data = token_response.json()
-        expiration_offset = token_data['expires_in']
-        expires_at = datetime.now() + timedelta(seconds = expiration_offset)
-        access_token = crud.create_access_token(token_data['access_token'], scope_activity_read_all, scope_profile_read_all, expires_at, user.id)
-        refresh_token = crud.create_refresh_token(token_data['refresh_token'], scope_activity_read_all, scope_profile_read_all, user.id)
-        user.strava_id = token_data['athlete']['id']
-        db.session.add_all([access_token, refresh_token])
-        db.session.commit()
+        strava_id = token_data['athlete']['id']
+        user = crud.get_user_by_strava_id(strava_id)
+        if not user: 
+            user = crud.create_user(strava_id)
+            db.session.add(user)
+            db.session.commit() 
+            expiration_offset = token_data['expires_in']
+            expires_at = datetime.now() + timedelta(seconds = expiration_offset)
+            access_token = crud.create_access_token(token_data['access_token'], scope_activity_read_all, scope_profile_read_all, expires_at, user.id)
+            refresh_token = crud.create_refresh_token(token_data['refresh_token'], scope_activity_read_all, scope_profile_read_all, user.id)
+            db.session.add_all([access_token, refresh_token])
+            db.session.commit()
+
+        login_user(user)
+        
+        # user.strava_id = token_data['athlete']['id']
+        
         return redirect('/home')
 
     return 'Authentication failed.'
@@ -253,6 +239,38 @@ def update_tokens_in_db(user_id, token_data):
 
     return access_token_code
 
+@app.route('/gear-reminders')
+def display_gear_reminders_home():
+    return render_template('home.html')
+
+@app.route('/fit-files')
+def fit_files_home():
+    user = current_user
+    access_token_code = retrieve_valid_access_code(user.id)
+
+    # retrieve user's last up to 200 activities from strava in the last week
+    headers = {'Authorization': f'Bearer {access_token_code}'}
+    week_ago = int(time.time()) - 604800
+    params = {'after': week_ago}
+    activities_response = requests.get(f'{BASE_URL}/athlete/activities', headers=headers, params=params)
+    activities_data = activities_response.json()
+    print(activities_data)
+    export_activities = []
+    for activity_data in activities_data: 
+        if activity_data.get('type', '') in THIRD_PARTY_ACTIVITIES: 
+            print(f"found an activity with id {activity_data['id']}")
+            activity = {}
+            activity["id"] = activity_data.get('id','')
+            activity["name"] = activity_data.get('name','')
+            date = activity_data.get('start_date_local','')
+            activity_date = datetime.strptime(date, '%Y-%m-%dT%H:%M:%SZ')
+            activity_datetime_friendly = activity_date.strftime('%m/%d at %I:%M %p')
+            activity["date"] = activity_datetime_friendly
+            activity["weekday"] = activity_date.strftime('%A')
+            activity["type"] = activity_data.get('type','')
+            export_activities.append(activity)
+    return render_template('fit-files.html', activities=export_activities)
+
 # display and update gear defaults routes
 @app.route('/update-gear')
 def updateGear():
@@ -260,7 +278,6 @@ def updateGear():
     return render_template('update-gear.html')
 
 @app.route('/retrieve-gear')
-# # @login_required
 def retrieve_gear():
     """Retrieve gear data from Strava."""
     user = current_user
@@ -297,7 +314,6 @@ def retrieve_gear():
     return render_template('set-default-gear.html', default_shoe = default_shoe, shoes = active_shoes)
 
 @app.route('/set-default-run-gear', methods=['POST'])
-# # @login_required
 def set_default_run_shoes():
     """Update the default running shoes for a user. """
     user = current_user
@@ -312,70 +328,6 @@ def set_default_run_shoes():
         shoe_obj.run_default = True
         db.session.commit()
     return redirect('/retrieve-gear')
-
-@app.route('/opt-into-email')
-
-
-########
-@app.route('/test-file-download')
-def pull_file_from_given_url():
-    activity_id = 10844712739
-    user = current_user
-    access_token = retrieve_valid_access_code(user.id)
-
-    inst = datetime.now()
-    download_url = f"https://www.strava.com/activities/{activity_id}/export_original"
-    response = requests.get(download_url)
-
-    if response.status_code == 200:
-        with open(f'activity_{activity_id}_{inst}.fit', 'wb') as f:
-            f.write(response.content)
-        print(f"Downloaded .fit file for activity {activity_id}")
-    else:
-        print(f"Failed to download .fit file for activity {activity_id}")
-    return 
-
-@app.route('/test-list')
-def files():
-    options = webdriver.ChromeOptions()
-    prefs = {"download.default_directory" : r'C:\Users\charl\Downloads\strava_files\\' }
-    options.add_experimental_option("prefs",prefs)
-    driver = webdriver.Chrome(options=options)
-    # driver.get('https://www.strava.com/activities/10823760775/export_original')
-    return("ok")
-
-@app.route('/files')
-# # @login_required
-def files_display():
-    user = current_user
-    access_token_code = retrieve_valid_access_code(user.id)
-
-    # retrieve user's last up to 200 activities from strava in the last week
-    headers = {'Authorization': f'Bearer {access_token_code}'}
-    week_ago = int(time.time()) - 604800
-    params = {'after': week_ago}
-    activities_response = requests.get(f'{BASE_URL}/athlete/activities', headers=headers, params=params)
-    activities_data = activities_response.json()
-    print(activities_data)
-    export_activities = []
-    for activity_data in activities_data: 
-        if activity_data.get('type', '') in THIRD_PARTY_ACTIVITIES: 
-            print(f"found an activity with id {activity_data['id']}")
-            activity = {}
-            activity["id"] = activity_data.get('id','')
-            activity["name"] = activity_data.get('name','')
-            date = activity_data.get('start_date_local','')
-            activity_date = datetime.strptime(date, '%Y-%m-%dT%H:%M:%SZ')
-            activity_datetime_friendly = activity_date.strftime('%m/%d at %I:%M %p')
-            activity["date"] = activity_datetime_friendly
-            activity["weekday"] = activity_date.strftime('%A')
-            activity["type"] = activity_data.get('type','')
-            export_activities.append(activity)
-    return render_template('testing.html', activities=export_activities)
-
-
-    
-########
 
 # process new activity routes 
 @celery.task

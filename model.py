@@ -15,13 +15,12 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, autoincrement=True, primary_key=True)
     strava_id = db.Column(db.Integer)
     email = db.Column(db.String, unique=True)
-    password_hash = db.Column(db.String, nullable=False)
+    password_hash = db.Column(db.String)
     created_on = db.Column(db.DateTime, nullable=False)
     email_consent = db.Column(db.Boolean)
 
-    def __init__(self, email, password):
-        self.email = email
-        self.password_hash = generate_password_hash(password)
+    def __init__(self, strava_id):
+        self.strava_id = strava_id 
         self.created_on = datetime.now()
         self.email_consent = False
 

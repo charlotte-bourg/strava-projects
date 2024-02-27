@@ -33,9 +33,9 @@ def get_user_by_strava_id(strava_id):
     """Retrieve a user by Strava ID."""
     return User.query.filter_by(strava_id=strava_id).first()
 
-def create_user(email, password):
+def create_user(strava_id):
     """Create a new user."""
-    user = User(email=email, password=password)
+    user = User(strava_id=strava_id)
     return user
 
 def set_password(user, password):
