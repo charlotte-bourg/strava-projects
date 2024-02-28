@@ -3,3 +3,4 @@ secrets.sh
 *.pyc
 ngrok.yml
 .coverage
+bootstrap/
