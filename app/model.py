@@ -4,8 +4,9 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from datetime import datetime
 from werkzeug.security import generate_password_hash
+from app import db 
 
-db = SQLAlchemy()
+# db = SQLAlchemy()
 
 class User(UserMixin, db.Model):
     """A user."""
@@ -82,18 +83,18 @@ class RefreshToken(db.Model):
     def __repr__(self):
         return f'<RefreshToken id={self.id} code={self.code}>'
 
-def connect_to_db(flask_app, db_uri="postgresql:///gearupdaterdb", echo=True):
-    """Connect to the database."""
-    flask_app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
-    flask_app.config["SQLALCHEMY_ECHO"] = echo
-    flask_app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# def connect_to_db(flask_app, db_uri="postgresql:///gearupdaterdb", echo=True):
+#     """Connect to the database."""
+#     flask_app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
+#     flask_app.config["SQLALCHEMY_ECHO"] = echo
+#     flask_app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    db.app = flask_app
-    db.init_app(flask_app)
+#     db.app = flask_app
+#     db.init_app(flask_app)
 
-    print("Connected to the database!")
+#     print("Connected to the database!")
 
-if __name__ == "__main__":
-    from server import app
-    connect_to_db(app)
-    app.app_context().push()
+# if __name__ == "__main__":
+#     from server import app
+#     connect_to_db(app)
+#     app.app_context().push()

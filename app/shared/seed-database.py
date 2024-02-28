@@ -1,7 +1,8 @@
 """Script to seed the database."""
 
 import os
-from model import connect_to_db, db
+from app import db 
+from app.model import connect_to_db, db
 import server
 
 # Drop and recreate the database

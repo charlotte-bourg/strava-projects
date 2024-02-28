@@ -1,6 +1,7 @@
 """CRUD operations for interacting with the database."""
 
-from model import db, User, AccessToken, RefreshToken, Shoe, connect_to_db
+from app import db
+from app.model import User, AccessToken, RefreshToken, Shoe
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 
@@ -75,7 +76,7 @@ def get_refresh_token(user_id):
     """Retrieve the refresh token for a user."""
     return RefreshToken.query.filter_by(user_id=user_id).one()
 
-if __name__ == '__main__':
-    from server import app
-    connect_to_db(app)
-    app.app_context().push()
+# if __name__ == '__main__':
+#     from server import app
+#     connect_to_db(app)
+#     app.app_context().push()
