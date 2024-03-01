@@ -4,7 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_mail import Mail
 from config import Config
-from celery import Celery, Task
+from celery import Celery
 import logging
 
 db = SQLAlchemy()

@@ -1,8 +1,8 @@
-import os
 import requests
 from app import crud
 from app import db 
 from datetime import datetime, timedelta
+from . import constants
 
 def retrieve_valid_access_code(user_id):
     """Retrieve a valid access code."""
@@ -22,13 +22,13 @@ def refresh_tokens(user_id):
     """Use user's refresh token to retrieve updated tokens."""
     refresh_token = crud.get_refresh_token(user_id)
     data = {
-        'client_id': CLIENT_ID,
-        'client_secret': CLIENT_SECRET,
+        'client_id': constants.CLIENT_ID,
+        'client_secret': constants.CLIENT_SECRET,
         'grant_type': 'refresh_token',
         'refresh_token': refresh_token.code,
     }
 
-    token_response = requests.post(TOKEN_URL, data=data) 
+    token_response = requests.post(constants.TOKEN_URL, data=data) 
     token_data = token_response.json()
     return token_data
 
