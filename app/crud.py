@@ -1,8 +1,6 @@
 """CRUD operations for interacting with the database."""
 
-from app import db
 from app.model import User, AccessToken, RefreshToken, Shoe
-from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 
 def get_user_by_id(user_id):
@@ -38,14 +36,6 @@ def create_user(strava_id):
     """Create a new user."""
     user = User(strava_id=strava_id)
     return user
-
-def set_password(user, password):
-    """Set the password for a user."""
-    user.password_hash = generate_password_hash(password)
-
-def check_password(user, password):
-    """Check if the provided password matches the user's password."""
-    return check_password_hash(user.password_hash, password)
 
 def create_access_token(code, scope_activity_read_all, scope_profile_read_all, expires_at, user_id):
     """Create an access token."""

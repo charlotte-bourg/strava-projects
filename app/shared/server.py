@@ -8,16 +8,8 @@ from flask_mail import Mail, Message
 from celery import Celery, Task
 import logging
 import app.crud as crud
-from app.model import db, connect_to_db
+from app.model import db
 from datetime import datetime, timedelta
-import time
-
-app = Flask(__name__)
-app.secret_key = os.environ['FLASK_KEY']
-
-# Flask-Login setup
-login_manager = LoginManager()
-login_manager.init_app(app)
 
 # Celery setup
 def celery_init_app(app: Flask) -> Celery: 
@@ -55,34 +47,6 @@ USER_FRIENDLY_SPORT_NAMES = {'Run': 'run', 'VirtualRun': 'virtual run', 'TrailRu
 @app.route('/gear-reminders')
 def display_gear_reminders_home():
     return render_template('home.html')
-
-@app.route('/fit-files')
-def fit_files_home():
-    user = current_user
-    access_token_code = retrieve_valid_access_code(user.id)
-
-    # retrieve user's last up to 200 activities from strava in the last week
-    headers = {'Authorization': f'Bearer {access_token_code}'}
-    week_ago = int(time.time()) - 604800
-    params = {'after': week_ago}
-    activities_response = requests.get(f'{BASE_URL}/athlete/activities', headers=headers, params=params)
-    activities_data = activities_response.json()
-    print(activities_data)
-    export_activities = []
-    for activity_data in activities_data: 
-        if activity_data.get('type', '') in THIRD_PARTY_ACTIVITIES: 
-            print(f"found an activity with id {activity_data['id']}")
-            activity = {}
-            activity["id"] = activity_data.get('id','')
-            activity["name"] = activity_data.get('name','')
-            date = activity_data.get('start_date_local','')
-            activity_date = datetime.strptime(date, '%Y-%m-%dT%H:%M:%SZ')
-            activity_datetime_friendly = activity_date.strftime('%m/%d at %I:%M %p')
-            activity["date"] = activity_datetime_friendly
-            activity["weekday"] = activity_date.strftime('%A')
-            activity["type"] = activity_data.get('type','')
-            export_activities.append(activity)
-    return render_template('fit-files.html', activities=export_activities)
 
 # display and update gear defaults routes
 @app.route('/update-gear')
@@ -183,7 +147,7 @@ def send_email(recipient_address, sport_type, user_default_shoe_name, activity_d
     print(msg.recipients)
     mail.send(msg)
 
-if __name__ == '__main__':
-    connect_to_db(app)
-    app.run('0.0.0.0', debug=True)
-    app.app_context().push()
+# if __name__ == '__main__':
+#     connect_to_db(app)
+#     app.run('0.0.0.0', debug=True)
+#     app.app_context().push()

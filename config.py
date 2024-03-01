@@ -5,7 +5,6 @@ class Config:
     SQLALCHEMY_DATABASE_URI = 'postgresql:///gearupdaterdb'
     SQLALCHEMY_ECHO = True
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-
     MAIL_SERVER = 'smtp.gmail.com'
     MAIL_PORT = 465
     MAIL_USERNAME = os.environ['SENDING_ADDRESS']
