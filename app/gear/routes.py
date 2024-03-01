@@ -146,8 +146,3 @@ def send_email(recipient_address, sport_type, user_default_shoe_name, activity_d
         Otherwise, this is your reminder to update your gear."  
     print(msg.recipients)
     mail.send(msg)
-
-# if __name__ == '__main__':
-#     connect_to_db(app)
-#     app.run('0.0.0.0', debug=True)
-#     app.app_context().push()
