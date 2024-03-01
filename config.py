@@ -11,3 +11,4 @@ class Config:
     MAIL_PASSWORD = os.environ['EMAIL_PASS']
     MAIL_USE_TLS = False
     MAIL_USE_SSL = True
+    CELERY_BROKER_URL = 'redis://localhost'

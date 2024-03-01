@@ -65,8 +65,3 @@ def get_access_token(user_id):
 def get_refresh_token(user_id):
     """Retrieve the refresh token for a user."""
     return RefreshToken.query.filter_by(user_id=user_id).one()
-
-# if __name__ == '__main__':
-#     from server import app
-#     connect_to_db(app)
-#     app.app_context().push()
