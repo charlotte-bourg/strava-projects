@@ -3,3 +3,6 @@ secrets.sh
 *.pyc
 ngrok.yml
 .coverage
+bootstrap/
+custom.css
+__pycache__

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Running Helper</title>
+    <link rel="icon" type="svg" href="/static/images/favicon.svg"></link>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"></link>
+    <link href="/static/bootstrap/bootstrap.css" rel="stylesheet"></link>
+    <link href="/static/styles/custom.css" type="text/css" rel="stylesheet"></link>
+    <link href="/static/styles/styles.css" rel="stylesheet"></link>
+  {% block styleblock %}
+  {% endblock %}
+  </head>
+
+  <body>
+    {% block flaskblock %}
+      {% for msg in get_flashed_messages() %}
+        <p class="flash-msg">
+          {{ msg }}
+        </p>
+      {% endfor %}
+    {% endblock %}
+
+    {% block body %}
+    {% endblock %}
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  </body>
+</html>
