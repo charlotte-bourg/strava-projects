@@ -1,6 +1,10 @@
 {% extends 'base.html' %}
 {% block body %}
 <div class="wide-outline-box">
-    <a class="btn btn-primary py-2" href="/fit-files">Get .FIT files</a></li>
+    <p class="py-2">Welcome to Running Helper.</p>
+    <ul class="list-group list-group-flush">
+        <a href="/retrieve-gear" class="no-ul"><li class="list-group-item">{% if gear_default %}<i class="bi bi-check-circle-fill px-2"></i>{% else %}<i class="bi bi-circle px-2"></i>{% endif %}</i></i>Set up gear defaults</li></a>
+        <a href="/opt-into-email" class="no-ul"><li class="list-group-item">{% if email_consent %}<i class="bi bi-check-circle-fill px-2"></i>{% else %}<i class="bi bi-circle px-2"></i>{% endif %}</i></i>Opt into email</li></a>
+    </ul>
 </div>
 {% endblock %}

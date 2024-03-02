@@ -1,31 +1,15 @@
 import os
 import requests
-from flask import Flask, flash, render_template, request, redirect, jsonify, Blueprint
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask import flash, render_template, request, redirect, jsonify
+from flask_login import login_user, logout_user, login_required
 from app import crud
 from app.auth import auth_bp
 from app import db 
 from datetime import datetime, timedelta
-import time
 from app import login_manager
 from . import helpers
+from . import constants
 
-# Retrieve secrets
-CLIENT_ID = os.environ['CLIENT_ID']
-CLIENT_SECRET = os.environ['CLIENT_SECRET']
-REDIRECT_URI = os.environ['REDIRECT_URI']
-STRAVA_VERIFY_TOKEN = os.environ['STRAVA_VERIFY_TOKEN']
-
-# Strava endpoints
-BASE_URL = 'https://www.strava.com/api/v3'
-AUTHORIZE_URL = 'https://www.strava.com/oauth/authorize'
-TOKEN_URL = 'https://www.strava.com/api/v3/oauth/token'
-DEAUTHORIZE_URL = 'https://www.strava.com/oauth/deauthorize'
-
-# Permission scopes for Strava authentication
-SCOPES = 'read,activity:read_all,profile:read_all'
-
-# user handling routes 
 @login_manager.user_loader
 def load_user(user_id):
     """Load user for Flask-Login."""
@@ -48,16 +32,7 @@ def logout():
 def logged_in_home(): 
     """Display home page for logged-in user."""
     return render_template('home.html')
-    # user = current_user
-    # strava_auth = crud.strava_authenticated(user.id)
-    # if crud.get_user_default_shoe(user.id):
-    #     gear_default = True
-    # else: 
-    #     gear_default = False 
-    # email_consent = user.email_consent 
-    # return render_template('home.html', strava_auth=strava_auth, gear_default=gear_default, email_consent=email_consent)
-
-# strava authentication routes
+ 
 @auth_bp.route('/strava-auth')
 def authenticate():
     """Redirect to Strava authentication."""
@@ -103,11 +78,9 @@ def callback():
             db.session.commit()
 
         login_user(user)
-        
-        # user.strava_id = token_data['athlete']['id']
-        
-        return redirect('/home')
 
+        return redirect('/home')
+    
     return 'Authentication failed.'
 
 @auth_bp.route('/webhook', methods=['GET','POST'])

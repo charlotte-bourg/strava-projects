@@ -21,7 +21,7 @@ def create_app(config_class=Config):
     from app.auth import auth_bp
     app.register_blueprint(auth_bp)
 
-    from app.fitfiles import fit_files_bp
-    app.register_blueprint(fit_files_bp)
+    from app.gear import gear_bp
+    app.register_blueprint(gear_bp)
 
     return app
